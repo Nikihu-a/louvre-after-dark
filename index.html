@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Louvre After Dark</title>
+  <meta name="description" content="Walk the Louvre after hours with a lamp. Ten masterpieces from 1483 to 1830, seen in 3D depth. Curated, designed and built by Niki.">
+  <meta name="author" content="Niki">
+  <meta name="theme-color" content="#07060a">
+  <meta property="og:title" content="Louvre After Dark — by Niki">
+  <meta property="og:description" content="Ten Louvre masterpieces from 1483 to 1830, seen in 3D depth by lamplight.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://nikihu-a.github.io/louvre-after-dark/assets/paintings/horatii-card.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307060a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%23d9b26f' stroke-width='1.6'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23ffe2aa'/%3E%3C/svg%3E">
+  <link rel="preload" href="assets/fonts/cormorant-garamond-latin-300-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/cormorant-garamond-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css?v=4">
+</head>
+<body class="is-loading">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- Loading -->
+  <div class="loader" id="loader" role="status" aria-live="polite">
+    <div class="loader-lamp" aria-hidden="true"></div>
+    <p class="loader-title"><em>Louvre</em> After Dark</p>
+    <p class="loader-text">Lighting the gallery <span id="loader-pct">0%</span></p>
+    <div class="loader-line" aria-hidden="true"><i id="loader-bar"></i></div>
+  </div>
+
+  <header class="topbar">
+    <a class="logo" href="#/" data-home>LOUVRE<i>·</i>NUIT</a>
+    <div class="topbar-right">
+      <button class="lights" id="lights" type="button" aria-pressed="false" title="Toggle lights (L)">
+        <span class="lights-dot" aria-hidden="true"></span><span class="lights-label">Lamp</span>
+      </button>
+      <span class="tag">Louvre After Dark <em>by Niki</em></span>
+    </div>
+  </header>
+
+  <!-- Intro (gallery scroll position before the first painting) -->
+  <section class="intro" id="intro">
+    <p class="kicker">Musée du Louvre · Après la fermeture</p>
+    <h1><em>Night falls.</em> The Louvre is closed.</h1>
+    <p class="hint">Move to carry the lamp <span>· Scroll to enter</span></p>
+  </section>
+
+  <!-- Gallery card captions, positioned over the 3D cards -->
+  <div class="cards-ui" id="cards-ui"></div>
+
+  <!-- Timeline scrubber -->
+  <nav class="scrub" id="scrub" aria-label="Timeline">
+    <div class="scrub-track" id="scrub-track">
+      <ol id="scrub-list"></ol>
+      <span class="scrub-dot" id="scrub-dot" aria-hidden="true"></span>
+    </div>
+  </nav>
+
+  <!-- Immersive view -->
+  <section class="view" id="view" aria-hidden="true">
+    <button class="view-back" id="view-back" type="button"><span aria-hidden="true">←</span> Gallery <kbd>Esc</kbd></button>
+
+    <div class="view-panel view-title" data-chapter="0">
+      <p class="eyebrow" id="v-eyebrow"></p>
+      <h2 id="v-original"></h2>
+      <p class="sub"><span id="v-title"></span> <b id="v-artist"></b></p>
+      <p class="lead" id="v-lead"></p>
+      <button class="pill" type="button" data-step="1">Explore details <span aria-hidden="true">→</span></button>
+    </div>
+
+    <div class="view-panel view-detail" data-chapter="detail">
+      <p class="num" id="d-num"></p>
+      <h3 id="d-title"></h3>
+      <p id="d-text"></p>
+    </div>
+
+    <div class="view-panel view-next" data-chapter="4">
+      <p class="eyebrow" id="n-eyebrow"></p>
+      <h2 id="n-title"></h2>
+      <button class="pill" type="button" id="n-go">Continue <span aria-hidden="true">→</span></button>
+    </div>
+
+    <div class="hotspots" id="hotspots"></div>
+
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+
+    <div class="view-foot">
+      <p class="view-meta" id="v-meta"></p>
+      <p class="view-hint"><span class="fine">Hold to magnify · <kbd>↑</kbd><kbd>↓</kbd> details · <kbd>←</kbd><kbd>→</kbd> paintings · <kbd>L</kbd> lights</span><span class="coarse">Press and hold to magnify · Swipe ↑↓ details, ←→ paintings</span></p>
+    </div>
+  </section>
+
+  <!-- End of the timeline -->
+  <section class="wall" id="wall" aria-label="The collection">
+    <div class="wall-inner">
+      <p class="eyebrow">1483 — 1830</p>
+      <h2><em>The collection.</em> Ten paintings, one night.</h2>
+      <ol class="wall-grid" id="wall-grid"></ol>
+      <footer class="wall-foot">
+        <p class="sig">Curated, designed &amp; built by <em>Niki</em></p>
+        <p class="links"><a href="https://github.com/Nikihu-a/louvre-after-dark" target="_blank" rel="noopener">Source on GitHub ↗</a></p>
+        <p class="credits">All ten paintings belong to the Musée du Louvre and are in the public domain. Photographs via Wikimedia Commons. Depth maps generated with Depth Anything V2. Typeface Cormorant Garamond (SIL OFL). 3D with three.js (MIT). An independent project, not affiliated with the Musée du Louvre.</p>
+        <p class="copy">© 2026 Niki</p>
+      </footer>
+    </div>
+  </section>
+
+  <div class="cursor" id="cursor" aria-hidden="true"><span id="cursor-label"></span></div>
+  <p class="sr-only" id="announce" aria-live="polite"></p>
+
+  <noscript><p class="noscript">This experience needs JavaScript and WebGL.</p></noscript>
+
+  <script type="module" src="js/app.js?v=4"></script>
+</body>
+</html>
