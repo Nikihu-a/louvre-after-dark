@@ -6,8 +6,6 @@
 
 Curated, designed and built by **Niki**.
 
-> 提灯夜游卢浮宫：沿着一条从 1483 年到 1830 年的时间轴，走过十幅卢浮宫名画。点开任意一幅，画面会变成可以“走进去”的 3D 舞台。
-
 ## The collection
 
 | Year | Painting | Artist |
@@ -34,7 +32,6 @@ Curated, designed and built by **Niki**.
 | Magnifier | Press and hold | Press and hold |
 | Lamp or full lights | `L` or the toggle in the top bar | The bulb icon |
 | Sound | The toggle in the top bar (or click to enter) | The speaker icon |
-| English / 中文 | The 中 / EN button | The 中 / EN button |
 | Back to the gallery | `Esc` or "Gallery" | "Gallery" |
 
 Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/louvre-after-dark/#/horatii). A lightweight version without 3D is at [`?static`](https://nikihu-a.github.io/louvre-after-dark/?static) (devices without WebGL 2 get it automatically).
@@ -49,7 +46,6 @@ Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/l
 - **Immersive view** (`js/immersive.js`). A full-screen parallax-occlusion ray march through the depth map, so near figures properly occlude far ones as the camera pans, dollies in or the lamp moves. The same shader draws the loupe and the depth-ordered dissolve between paintings.
 - **Hand-off.** When you open a painting, its card flies to exactly the size and position of the immersive view's first frame, so the switch between the two renderers is invisible.
 - **Performance.** Images are WebP; only the first four cards gate the loader and the rest stream in behind it. If frames run long, the renderer steps its resolution and ray-march quality down, and back up when there is headroom. A lost WebGL context (e.g. after sleep) is restored automatically.
-- **Languages.** English and Chinese; texts live in `js/data.js` and `js/i18n.js`, and the choice is remembered.
 
 ## Run locally
 
@@ -74,7 +70,7 @@ curl -L -o lama.onnx https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp
 .venv/bin/python tools/make_og.py                                               # share image
 ```
 
-Painting texts and hotspot positions live in `js/data.js` (English) and `js/i18n.js` (Chinese). After changing CSS or JS, bump the `?v=` numbers in `index.html` so returning visitors don't get a cached copy.
+Painting texts and hotspot positions live in `js/data.js`; interface strings in `js/strings.js`. After changing CSS or JS, bump the `?v=` numbers in `index.html` so returning visitors don't get a cached copy.
 
 ## Credits
 

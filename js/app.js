@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { PAINTINGS } from "./data.js";
-import { UI, ZH } from "./i18n.js";
+import { UI } from "./strings.js";
 import { Sound } from "./audio.js";
 import { Gallery, CARD_H } from "./gallery.js";
 import { Immersive, PARALLAX, fitHeight } from "./immersive.js";
@@ -45,11 +45,6 @@ function powerAt(i, t) {
   return 1;
 }
 
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
-};
-
 // ---------------------------------------------------------------- tweens
 const tweens = new Set();
 function tween(seconds, onUpdate, onDone) {
@@ -68,27 +63,14 @@ function runTweens(now) {
   }
 }
 
-// ---------------------------------------------------------------- language
-let lang = store.get("lad-lang") === "zh" ? "zh" : "en";
-const L = () => UI[lang];
-// Painting texts in the current language.
-const text = (p) => {
-  if (lang !== "zh") return p;
-  const z = ZH[p.id];
-  return { ...p, ...z, hotspots: p.hotspots.map((h, k) => ({ ...h, ...z.hotspots[k] })) };
-};
-const langListeners = [];
-function applyLang() {
-  const u = L();
-  document.documentElement.lang = u.lang;
+// ---------------------------------------------------------------- strings
+const L = () => UI;
+// Fill the interface strings marked with data-i18n.
+function fillStrings() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
-    const v = u[el.dataset.i18n];
+    const v = UI[el.dataset.i18n];
     if (typeof v === "string") el.textContent = v;
   });
-  const btn = $("#lang");
-  btn.textContent = u.toggle;
-  btn.setAttribute("aria-label", u.toggleLabel);
-  langListeners.forEach((f) => f());
 }
 
 // ---------------------------------------------------------------- DOM
@@ -105,7 +87,7 @@ const ui = {
   scrubList: $("#scrub-list"), scrubDot: $("#scrub-dot"),
   view: $("#view"), hotspots: $("#hotspots"), chapters: $("#chapters"), wall: $("#wall"), wallGrid: $("#wall-grid"),
   cursor: $("#cursor"), cursorLabel: $("#cursor-label"), lights: $("#lights"), sound: $("#sound"),
-  lang: $("#lang"), lost: $("#lost"), announce: $("#announce"),
+  lost: $("#lost"), announce: $("#announce"),
 };
 
 // Wall (also the fallback without WebGL).
@@ -123,16 +105,9 @@ const wallTitles = PAINTINGS.map((p, i) => {
   ui.wallGrid.append(li);
   return { img, t };
 });
-langListeners.push(() => PAINTINGS.forEach((p, i) => {
-  const tp = text(p);
-  wallTitles[i].t.textContent = tp.title;
-  wallTitles[i].img.alt = `${tp.title}, ${tp.artist}`;
-}));
-
-ui.lang.addEventListener("click", () => {
-  lang = lang === "en" ? "zh" : "en";
-  store.set("lad-lang", lang);
-  applyLang();
+PAINTINGS.forEach((p, i) => {
+  wallTitles[i].t.textContent = p.title;
+  wallTitles[i].img.alt = `${p.title}, ${p.artist}`;
 });
 
 function noWebGL() {
@@ -154,7 +129,7 @@ else {
     noWebGL();
   }
 }
-applyLang();
+fillStrings();
 if (renderer) start();
 
 function start() {
@@ -326,30 +301,22 @@ function run(loadCard, loadFull, order, deep) {
   function labelGallery() {
     const u = L();
     PAINTINGS.forEach((p, i) => {
-      const tp = text(p);
-      cardEls[i].artist.textContent = tp.artist;
-      cardEls[i].title.textContent = tp.title;
-      cardEls[i].era.textContent = tp.era;
-      cardEls[i].btn.setAttribute("aria-label", u.open(tp.title));
-      scrubBtns[i].setAttribute("aria-label", `${p.date}, ${tp.title}`);
+      cardEls[i].artist.textContent = p.artist;
+      cardEls[i].title.textContent = p.title;
+      cardEls[i].era.textContent = p.era;
+      cardEls[i].btn.setAttribute("aria-label", u.open(p.title));
+      scrubBtns[i].setAttribute("aria-label", `${p.date}, ${p.title}`);
     });
     chapterBtns.forEach((b, c) => b.setAttribute("aria-label", u.chapters[c]));
     labelToggles();
     ui.lights.title = u.lightsTitle;
   }
-  langListeners.push(labelGallery);
-  langListeners.push(() => {
-    if (S.viewOpacity > 0) {
-      fillView(S.current);
-      setChapter(S.chapter, true);
-    }
-  });
   labelGallery();
 
   // ------------------------------------------------ view content
   function fillView(i) {
     const u = L();
-    const p = text(PAINTINGS[i]);
+    const p = PAINTINGS[i];
     $("#v-eyebrow").textContent = `${p.date} · ${p.era}`;
     $("#v-original").textContent = p.original;
     $("#v-title").textContent = p.title;
@@ -358,7 +325,7 @@ function run(loadCard, loadFull, order, deep) {
     $("#v-meta").textContent = u.meta(p, p.inv);
     const next = PAINTINGS[i + 1];
     $("#n-eyebrow").textContent = next ? u.next(next.date) : u.endEyebrow;
-    $("#n-title").textContent = next ? text(next).title : u.endTitle;
+    $("#n-title").textContent = next ? next.title : u.endTitle;
     $("#n-go-label").textContent = next ? u.continue : u.leave;
 
     ui.hotspots.textContent = "";
@@ -375,7 +342,7 @@ function run(loadCard, loadFull, order, deep) {
   function setChapter(c, quiet) {
     c = clamp(c, 0, 4);
     S.chapter = c;
-    const p = text(PAINTINGS[S.current]);
+    const p = PAINTINGS[S.current];
     if (c >= 1 && c <= 3) {
       const h = p.hotspots[c - 1];
       $("#d-num").textContent = L().detailOf(c);
@@ -411,7 +378,7 @@ function run(loadCard, loadFull, order, deep) {
 
   const announce = (msg) => { ui.announce.textContent = msg; };
   const describe = (i) => {
-    const p = text(PAINTINGS[i]);
+    const p = PAINTINGS[i];
     return `${p.date}: ${p.title}, ${p.artist}`;
   };
 
