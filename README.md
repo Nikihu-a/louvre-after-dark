@@ -41,6 +41,7 @@ Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/l
 - **No build step.** Plain HTML, CSS and ES modules; [three.js](https://threejs.org) r169 is vendored in `vendor/`, and fonts are self-hosted, so the site loads without any third-party CDN.
 - **Depth maps.** Each painting has a depth map estimated offline with [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) (`tools/make_depth.py`). Near edges are dilated slightly so the figures keep clean silhouettes.
 - **Background plates.** When the camera moves, a gap opens behind every figure. `tools/make_plate.py` finds the near side of every depth edge and has [LaMa](https://github.com/advimman/lama) inpaint what lies behind it; the shader re-traces those gaps against this plate instead of stretching the figure's edge.
+- **Era soundtrack.** Each era of the timeline has its own music, written within a few decades of its paintings — a Renaissance lute ricercar, French Baroque and Rococo harpsichord, Mozart in 1784, Chopin in 1830. It crossfades as you travel and dips when a painting is open. Tracks load only once sound is switched on.
 - **Opening.** The camera starts far back, looking at the middle of the arc, and dollies in while the spotlights switch on one by one from 1483 to 1830. The clack of each switch is synthesized with the Web Audio API — there are no audio files.
 - **Gallery** (`js/gallery.js`). Cards are bent onto a cylinder in the vertex shader; the radius tightens and colors split slightly with scroll speed. Each card is mirrored, blurred, into the polished floor. A one-tap depth offset makes the centered card breathe with the cursor.
 - **Immersive view** (`js/immersive.js`). A full-screen parallax-occlusion ray march through the depth map, so near figures properly occlude far ones as the camera pans, dollies in or the lamp moves. The same shader draws the loupe and the depth-ordered dissolve between paintings.
@@ -68,6 +69,7 @@ curl -L -o lama.onnx https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp
 .venv/bin/python tools/fetch_paintings.py depth-small.onnx lama.onnx            # all paintings
 .venv/bin/python tools/fetch_paintings.py depth-small.onnx lama.onnx horatii    # just one
 .venv/bin/python tools/make_og.py                                               # share image
+.venv/bin/python tools/make_music.py "$(which ffmpeg)" path/to/recordings      # music loops, see assets/music/CREDITS.md
 ```
 
 Painting texts and hotspot positions live in `js/data.js`; interface strings in `js/strings.js`. After changing CSS or JS, bump the `?v=` numbers in `index.html` so returning visitors don't get a cached copy.
@@ -77,6 +79,7 @@ Painting texts and hotspot positions live in `js/data.js`; interface strings in 
 - All ten paintings are in the collection of the **Musée du Louvre** and are in the public domain. Photographs via [Wikimedia Commons](https://commons.wikimedia.org).
 - Depth estimation: Depth Anything V2 (small), via the ONNX export by onnx-community.
 - Background inpainting: LaMa, via the ONNX export by Carve.
+- Music: recordings by David Hernández Romero (CC BY 3.0), Richard D. Siegel (CC BY-SA 4.0), David Joseph Stith (CC0) and Musopen (public domain); details in [`assets/music/CREDITS.md`](assets/music/CREDITS.md).
 - Typeface: [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant), SIL Open Font License (`assets/fonts/OFL.txt`).
 - 3D: [three.js](https://threejs.org), MIT License (`vendor/three.LICENSE`).
 
@@ -84,4 +87,4 @@ This is an independent project and is not affiliated with or endorsed by the Mus
 
 ## License
 
-Code is released under the [MIT License](LICENSE). The painting images are public domain; the font and three.js keep their own licenses.
+Code is released under the [MIT License](LICENSE). The painting images are public domain; the music recordings, the font and three.js keep their own licenses.

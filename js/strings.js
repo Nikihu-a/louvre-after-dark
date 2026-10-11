@@ -34,7 +34,7 @@ export const UI = {
   wallRest: "Ten paintings, one night.",
   sig: "Curated, designed & built by",
   source: "Source on GitHub ↗",
-  credits: "All ten paintings belong to the Musée du Louvre and are in the public domain. Photographs via Wikimedia Commons. Depth maps generated with Depth Anything V2, background plates with LaMa. Typeface Cormorant Garamond (SIL OFL). 3D with three.js (MIT). An independent project, not affiliated with the Musée du Louvre.",
+  credits: "All ten paintings belong to the Musée du Louvre and are in the public domain. Photographs via Wikimedia Commons. Depth maps generated with Depth Anything V2, background plates with LaMa. Typeface Cormorant Garamond (SIL OFL). 3D with three.js (MIT). Music, each from its paintings' own era: Francesco da Milano, Ricercar XXXI, played by David Hernández Romero (CC BY 3.0); Louis Couperin, Chaconne in D minor, Richard D. Siegel (CC BY-SA 4.0); François Couperin, L'Art de toucher le clavecin, David Joseph Stith (CC0); Mozart, Sonata K. 333, Musopen (public domain); Chopin, Nocturne Op. 9 No. 1, Olga Gurevich / Musopen (public domain); excerpted and faded for looping. An independent project, not affiliated with the Musée du Louvre.",
   cursorView: "View",
   cursorGo: "Go",
   lost: "Relighting the gallery…",

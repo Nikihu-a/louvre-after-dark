@@ -1,10 +1,12 @@
 // The collection, in chronological order. Hotspot x/y are image uv (0..1, y down).
 // `tint` is the lamp color for the painting's era; `focus` is the depth value
 // that stays still while the camera moves (roughly the main figures' plane).
+// `music` picks the era soundtrack (see TRACKS in audio.js).
 
 export const PAINTINGS = [
   {
     id: "virgin-of-the-rocks",
+    music: "renaissance",
     year: 1483,
     date: "c. 1483–1486",
     title: "The Virgin of the Rocks",
@@ -29,6 +31,7 @@ export const PAINTINGS = [
   },
   {
     id: "mona-lisa",
+    music: "renaissance",
     year: 1503,
     date: "1503–1519",
     title: "Mona Lisa",
@@ -53,6 +56,7 @@ export const PAINTINGS = [
   },
   {
     id: "wedding-at-cana",
+    music: "renaissance",
     year: 1563,
     date: "1562–1563",
     title: "The Wedding at Cana",
@@ -77,6 +81,7 @@ export const PAINTINGS = [
   },
   {
     id: "the-cheat",
+    music: "baroque",
     year: 1635,
     date: "c. 1636–1638",
     title: "The Cheat with the Ace of Diamonds",
@@ -101,6 +106,7 @@ export const PAINTINGS = [
   },
   {
     id: "the-lacemaker",
+    music: "baroque",
     year: 1669,
     date: "c. 1669–1670",
     title: "The Lacemaker",
@@ -125,6 +131,7 @@ export const PAINTINGS = [
   },
   {
     id: "cythera",
+    music: "rococo",
     year: 1717,
     date: "1717",
     title: "Pilgrimage to Cythera",
@@ -149,6 +156,7 @@ export const PAINTINGS = [
   },
   {
     id: "horatii",
+    music: "neoclassical",
     year: 1784,
     date: "1784",
     title: "The Oath of the Horatii",
@@ -173,6 +181,7 @@ export const PAINTINGS = [
   },
   {
     id: "coronation",
+    music: "neoclassical",
     year: 1805,
     date: "1805–1807",
     title: "The Coronation of Napoleon",
@@ -197,6 +206,7 @@ export const PAINTINGS = [
   },
   {
     id: "medusa",
+    music: "romantic",
     year: 1818,
     date: "1818–1819",
     title: "The Raft of the Medusa",
@@ -221,6 +231,7 @@ export const PAINTINGS = [
   },
   {
     id: "liberty",
+    music: "romantic",
     year: 1830,
     date: "1830",
     title: "Liberty Leading the People",

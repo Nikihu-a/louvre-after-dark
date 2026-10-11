@@ -1,7 +1,7 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { PAINTINGS } from "./data.js";
 import { UI } from "./strings.js";
-import { Sound } from "./audio.js";
+import { Sound, TRACKS } from "./audio.js";
 import { Gallery, CARD_H } from "./gallery.js";
 import { Immersive, PARALLAX, fitHeight } from "./immersive.js";
 
@@ -87,7 +87,7 @@ const ui = {
   scrubList: $("#scrub-list"), scrubDot: $("#scrub-dot"),
   view: $("#view"), hotspots: $("#hotspots"), chapters: $("#chapters"), wall: $("#wall"), wallGrid: $("#wall-grid"),
   cursor: $("#cursor"), cursorLabel: $("#cursor-label"), lights: $("#lights"), sound: $("#sound"),
-  lost: $("#lost"), announce: $("#announce"),
+  lost: $("#lost"), announce: $("#announce"), nowPlaying: $("#now-playing"),
 };
 
 // Wall (also the fallback without WebGL): each painting with a museum-style label.
@@ -258,7 +258,7 @@ function run(loadCard, loadFull, order, deep) {
     thresh: -0.2, invert: 0,
     wheelAcc: 0, lastStep: 0,
     announced: -2,
-    tier: 0, frameMs: 16.7, tierAt: 0,
+    tier: 0, frameMs: 16.7, tierAt: 0, playing: "",
   };
 
   // ------------------------------------------------ captions & timeline DOM
@@ -1010,6 +1010,18 @@ function run(loadCard, loadFull, order, deep) {
       }
       if (ui.cursorLabel.textContent !== label) ui.cursorLabel.textContent = label;
       ui.cursor.classList.toggle("label", !!label);
+    }
+
+    // Era soundtrack: follow the painting you have settled on.
+    if (S.viewOpacity > 0.5 || (S.mode !== "gallery" && S.focusIndex >= 0)) sound.setEra(PAINTINGS[S.current].music);
+    else if (S.opening !== "done") sound.setEra(PAINTINGS[0].music);
+    else if (Math.abs(S.C - S.T) < 0.5) sound.setEra(PAINTINGS[clamp(Math.round(S.T), 0, N - 1)].music);
+    sound.duck(S.viewOpacity > 0.5 || wallK > 0.5);
+    const playing = sound.on && sound.voice ? sound.voice.era : "";
+    if (playing !== S.playing) {
+      S.playing = playing;
+      ui.nowPlaying.classList.toggle("on", !!playing);
+      if (playing) ui.nowPlaying.textContent = `♪ ${TRACKS[playing].title} · ${TRACKS[playing].year}`;
     }
 
     S.wheelAcc = damp(S.wheelAcc, 0, 3, dt);

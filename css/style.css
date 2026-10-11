@@ -204,6 +204,27 @@ h1 em, h2 em {
 .toggle[aria-pressed="false"] .wave { opacity: 0.25; }
 
 
+.now-playing {
+  position: fixed;
+  top: max(54px, calc(env(safe-area-inset-top) + 40px));
+  right: var(--gutter);
+  z-index: 20;
+  max-width: min(460px, 70vw);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-dim);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.8s, transform 0.8s var(--ease);
+}
+.now-playing.on { opacity: 1; transform: none; }
+
 /* ---------- intro ---------- */
 .intro {
   position: fixed;
@@ -741,6 +762,7 @@ h1 em, h2 em {
   .topbar .tag em { font-size: 15px; margin: 0; }
   .topbar-right { gap: 12px; }
   .toggle-label, .toggle-dot { display: none; }
+  .now-playing { font-size: 12px; max-width: 80vw; }
   .toggle-icon { display: block; }
   .toggle { padding: 6px 2px; }
   .scrub li button { font-size: 0; padding-top: 10px; }
