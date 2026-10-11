@@ -81,6 +81,7 @@ def smooth(a, b, x):
 
 # ---------------------------------------------------------------- depth stage
 MARGIN, MAX_CROP, SPREAD, PAR = 1.08, 1.35, 1.0, 0.03
+STEPS = 32  # ray-march layers
 
 
 def fit_height(sa, ia):
@@ -88,8 +89,8 @@ def fit_height(sa, ia):
     return min(max(1, r) * MARGIN, min(1, r) * MAX_CROP)
 
 
-def mag(h, zoom):
-    d0 = 1 + (1 - h) * SPREAD
+def mag(h, zoom, spread=SPREAD):
+    d0 = 1 + (1 - h) * spread
     return d0 / (d0 - zoom)
 
 
@@ -102,6 +103,9 @@ class Stage:
         self.plate = cv2.resize(load(f"{pid}-plate.webp", "RGB"), (self.img.shape[1], self.img.shape[0]))
         self.bg = cv2.resize(load(f"{pid}-bgdepth.webp", "L"), (self.depth.shape[1], self.depth.shape[0]))
         self.shot = shot
+        # How much farther the background sits than the foreground; smaller
+        # values keep strong push-ins free of doubled edges.
+        self.spread = shot.get("spread", SPREAD)
         sa, ia = W / H, shot["aspect"]
         hd = fit_height(sa, ia)
         self.k = (sa / (hd * ia), 1 / hd)
@@ -113,39 +117,85 @@ class Stage:
         hh, ww = src.shape[:2]
         return cv2.remap(src, px * (ww - 1), py * (hh - 1), cv2.INTER_LINEAR, borderMode=border)
 
-    def anchor(self, zoom, c):
-        target = (0.6, 0.42)
+    def anchor(self, zoom, c, target=(0.6, 0.42), free=0.0):
+        """Where image point c sits on screen. free=1 lets the frame run past the
+        canvas edge (into the dark room) to centre a detail near the edge."""
         w = clamp01(zoom / 0.4)
-        m0 = mag(0, zoom)
+        m0 = mag(0, zoom, self.spread)
         out = []
         for i in range(2):
             half = min(0.5, self.k[i] / 2)
             lo = 0.5 + half - (1 - c[i] - PAR * 0.6) * m0
             hi = 0.5 - half + (c[i] - PAR * 0.6) * m0
             a = c[i] + (target[i] - c[i]) * w
-            out.append(min(hi, max(lo, a)) if lo <= hi else c[i])
+            held = min(hi, max(lo, a)) if lo <= hi else c[i]
+            out.append(held + (a - held) * free)
         return out
 
     def frame(self, t):
-        """t in 0..1 across the shot."""
+        """The trailer's camera: t in 0..1 across the shot."""
         sh = self.shot
         e = ease(t)
-        zoom = sh["zoom"][0] + (sh["zoom"][1] - sh["zoom"][0]) * e
-        c = [0.5 + (sh["target"][i] - 0.5) * e for i in range(2)]
-        a = self.anchor(zoom, c)
-        par = ((t - 0.5) * 2 * PAR, math.sin(t * math.pi) * PAR * 0.3)
+        if sh.get("reveal"):
+            ambient = 0.06 + 0.58 * ease(clamp01(t * 1.6))
+            light = (0.15 + 0.32 * ease(clamp01(t * 1.3)), 0.32)
+            lamp = 1.1 - 0.5 * ease(clamp01(t * 1.6))
+        else:
+            ambient, lamp, light = 0.68, 0.5, (0.42 + 0.2 * t, 0.38)
+        return self.render(dict(
+            zoom=sh["zoom"][0] + (sh["zoom"][1] - sh["zoom"][0]) * e,
+            c=[0.5 + (sh["target"][i] - 0.5) * e for i in range(2)],
+            par=((t - 0.5) * 2 * PAR, math.sin(t * math.pi) * PAR * 0.3),
+            ambient=ambient, lamp=lamp, light=light,
+        ))
+
+    def project(self, q, cam):
+        """Screen position (pixels) of image point q at its own depth."""
+        zoom, c, par = cam["zoom"], cam["c"], cam["par"]
+        a = self.anchor(zoom, c, cam.get("anchor", (0.6, 0.42)), cam.get("free", 0.0))
+        dh, dw = self.depth.shape
+        h = float(self.depth[int(q[1] * (dh - 1)), int(q[0] * (dw - 1))])
+        m = mag(h, zoom, self.spread)
+        off = h - self.shot["focus"]
+        b = [a[i] + (q[i] - par[i] * off - c[i]) * m for i in range(2)]
+        return ((b[0] - 0.5) / self.k[0] + 0.5) * W, ((b[1] - 0.5) / self.k[1] + 0.5) * H
+
+    def render(self, cam):
+        """cam: zoom, c (image uv), par, ambient, lamp, light (screen uv), optional anchor."""
+        sh = self.shot
+        zoom, c, par = cam["zoom"], cam["c"], cam["par"]
+        a = self.anchor(zoom, c, cam.get("anchor", (0.6, 0.42)), cam.get("free", 0.0))
         focus = sh["focus"]
         bx, by = self.b
 
         def at(h):
-            m = mag(h, zoom)
+            m = mag(h, zoom, self.spread)
             return ((c[0] + (bx - a[0]) / m + par[0] * (h - focus)).astype(np.float32),
                     (c[1] + (by - a[1]) / m + par[1] * (h - focus)).astype(np.float32))
 
-        h = np.full((H, W), focus, np.float32)
-        for _ in range(4):  # fixed-point stand-in for the shader's ray march
-            px, py = at(h)
-            h = self.sample(self.depth, px, py)
+        # Ray march through the depth map, as the site's shader does: step from
+        # the nearest layer back and take the first surface the ray meets, so
+        # near figures occlude far ones instead of appearing twice.
+        px, py = at(0.0)
+        h = np.zeros((H, W), np.float32)
+        found = np.zeros((H, W), bool)
+        prev_x, prev_y, prev_h, prev_gap = None, None, 1.0, np.zeros((H, W), np.float32)
+        for hs in np.linspace(1.0, 0.0, STEPS, dtype=np.float32):
+            qx, qy = at(float(hs))
+            d = self.sample(self.depth, qx, qy)
+            hit = (d >= hs) & ~found
+            if prev_x is None:
+                rx, ry, rh = qx, qy, np.full((H, W), hs, np.float32)
+            else:
+                under = np.maximum(d - hs, 0)
+                w = under / (under + prev_gap + 1e-5)
+                rx, ry = qx + (prev_x - qx) * w, qy + (prev_y - qy) * w
+                rh = hs + (prev_h - hs) * w
+            px = np.where(hit, rx, px)
+            py = np.where(hit, ry, py)
+            h = np.where(hit, rh, h)
+            found |= hit
+            prev_x, prev_y, prev_h, prev_gap = qx, qy, hs, hs - d
         col = self.sample(self.img, px, py)
 
         # Fill disocclusions from the inpainted plate, as the site does.
@@ -153,7 +203,7 @@ class Stage:
         dx = self.sample(self.depth, px + ex, py) - self.sample(self.depth, px - ex, py)
         dy = self.sample(self.depth, px, py + ey) - self.sample(self.depth, px, py - ey)
         wall = np.sqrt(dx * dx + dy * dy)
-        travel = math.hypot(par[0], par[1]) + np.abs(bx - a[0]) * abs(1 / mag(1, zoom) - 1 / mag(0, zoom))
+        travel = math.hypot(par[0], par[1]) + np.abs(bx - a[0]) * abs(1 / mag(1, zoom, self.spread) - 1 / mag(0, zoom, self.spread))
         wk = (smooth(0.05, 0.2, wall) * smooth(0.0015, 0.008, travel))[..., None]
         hb = self.sample(self.bg, *at(np.full((H, W), focus, np.float32)))
         qx, qy = at(hb)
@@ -162,13 +212,8 @@ class Stage:
         # Lamp and room light.
         sx, sy = self.s
         asp = W / H
-        if sh.get("reveal"):
-            ambient = 0.06 + 0.58 * ease(clamp01(t * 1.6))
-            lx, ly = 0.15 + 0.32 * ease(clamp01(t * 1.3)), 0.32
-            lamp = 1.1 - 0.5 * ease(clamp01(t * 1.6))
-        else:
-            ambient, lamp = 0.68, 0.5
-            lx, ly = 0.42 + 0.2 * t, 0.38
+        ambient, lamp = cam["ambient"], cam["lamp"]
+        lx, ly = cam["light"]
         d2 = ((sx - lx) * asp) ** 2 + (sy - ly) ** 2
         spot = np.exp(-d2 / 0.11)
         nz = 1 / np.sqrt(1 + (dx * 7) ** 2 + (dy * 7) ** 2)
