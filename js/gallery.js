@@ -81,7 +81,7 @@ const CARD_FRAG = /* glsl */ `
       // Cheap one-tap depth parallax: enough to make the centered card breathe.
       vec2 uv = vUv + uPar * (h - uDepthFocus) * uActive;
       // Chromatic split while the strip is moving fast.
-      vec2 ca = vec2(clamp(uVel, -3.0, 3.0) * 0.0035, 0.0);
+      vec2 ca = vec2(clamp(uVel, -2.0, 2.0) * 0.0028, 0.0);
       col = vec3(texture2D(uMap, uv + ca).r, texture2D(uMap, uv).g, texture2D(uMap, uv - ca).b);
     }
     col = mix(vec3(0.05, 0.045, 0.05), col, uLoaded);

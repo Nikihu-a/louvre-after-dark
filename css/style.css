@@ -160,6 +160,17 @@ h1 em, h2 em {
   pointer-events: none;
 }
 .topbar > *, .topbar-right > * { pointer-events: auto; }
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -28px;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgba(7, 6, 10, 0.92) 55%, rgba(7, 6, 10, 0));
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+/* On the scrolling wall, keep content from running under the top bar. */
+.on-wall .topbar::before { opacity: 1; }
 .logo { font-weight: 600; color: var(--ink); text-decoration: none; }
 .logo i { font-style: normal; color: var(--gold); margin: 0 0.25em; }
 .topbar-right { display: flex; align-items: center; gap: 22px; }
@@ -594,31 +605,80 @@ h1 em, h2 em {
   line-height: 1.04;
   margin: 12px 0 44px;
 }
+/* Like a gallery hang: every painting sits on one line, with a label beneath
+   it whose date, title and artist line up across the row. */
 .wall-grid {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 28px 22px;
-  width: min(1100px, 100%);
-  align-items: end;
+  gap: 56px clamp(18px, 2.4vw, 36px);
+  width: min(1180px, 100%);
+  align-items: start;
 }
 .wall-grid button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
   width: 100%;
+  text-align: center;
+}
+.wall-grid .frame {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: clamp(130px, 15vw, 190px);
 }
 .wall-grid img {
-  width: 100%;
-  height: 150px;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.8);
   filter: brightness(0.82);
   transition: filter 0.4s, transform 0.6s var(--ease);
 }
 .wall-grid button:hover img { filter: brightness(1.05); transform: translateY(-4px); }
-.wall-grid .y { font-family: var(--serif); font-style: italic; color: var(--gold); font-size: 15px; }
-.wall-grid .t { font-family: var(--serif); font-size: 17px; line-height: 1.15; color: var(--ink); }
+.wall-grid .label {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin-top: 22px;
+  padding-top: 16px;
+  max-width: 17em;
+  position: relative;
+}
+.wall-grid .label::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  width: 22px; height: 1px;
+  margin-left: -11px;
+  background: rgba(217, 178, 111, 0.55);
+}
+.wall-grid .y {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--gold);
+}
+.wall-grid .t {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(18px, 1.6vw, 22px);
+  line-height: 1.14;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.wall-grid .a {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.wall-grid button:hover .t { color: #fff; }
 .wall-foot {
   margin-top: auto;
   padding-top: 56px;
@@ -694,8 +754,11 @@ h1 em, h2 em {
   .view-foot { justify-content: center; }
   .chapters { top: auto; bottom: 30%; }
   .view-back kbd { display: none; }
-  .wall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 16px; }
-  .wall-grid img { height: 120px; }
+  .wall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 16px; }
+  .wall-grid .frame { height: 120px; }
+  .wall-grid .label { margin-top: 16px; padding-top: 12px; }
+  .wall-grid .t { font-size: 17px; }
+  .wall-grid .a { font-size: 13px; }
 }
 
 @media (max-height: 560px) {

@@ -90,28 +90,28 @@ const ui = {
   lost: $("#lost"), announce: $("#announce"),
 };
 
-// Wall (also the fallback without WebGL).
-const wallTitles = PAINTINGS.map((p, i) => {
+// Wall (also the fallback without WebGL): each painting with a museum-style label.
+PAINTINGS.forEach((p, i) => {
   const li = el("li");
   const b = el("button");
   b.type = "button";
+  const frame = el("span", "frame");
   const img = el("img");
   img.src = `assets/paintings/${p.id}-card.webp`;
+  img.alt = `${p.title}, ${p.artist}`;
   img.loading = "lazy";
-  const t = el("span", "t");
-  b.append(img, el("span", "y", p.date), t);
+  frame.append(img);
+  const label = el("span", "label");
+  label.append(el("span", "y", p.date), el("span", "t", p.title), el("span", "a", p.artist));
+  b.append(frame, label);
   b.addEventListener("click", () => openPainting(i));
   li.append(b);
   ui.wallGrid.append(li);
-  return { img, t };
-});
-PAINTINGS.forEach((p, i) => {
-  wallTitles[i].t.textContent = p.title;
-  wallTitles[i].img.alt = `${p.title}, ${p.artist}`;
 });
 
 function noWebGL() {
   document.documentElement.classList.add("no-webgl");
+  document.body.classList.add("on-wall");
   document.body.classList.remove("is-loading");
   ui.loader.classList.add("done");
 }
@@ -980,6 +980,7 @@ function run(loadCard, loadFull, order, deep) {
     ui.wall.style.opacity = wallO.toFixed(3);
     ui.wall.classList.toggle("live", wallO > 0.01);
     ui.wall.style.pointerEvents = wallO > 0.5 ? "auto" : "none";
+    document.body.classList.toggle("on-wall", wallO > 0.5);
 
     // Announce the painting in front of you.
     const nearest = S.C < -0.5 ? -1 : S.C > N - 0.5 ? N : ci;

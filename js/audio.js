@@ -6,6 +6,12 @@ export class Sound {
   constructor() {
     this.ctx = null;
     this.on = false;
+    // Never play from a background tab.
+    document.addEventListener("visibilitychange", () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend();
+      else if (this.on) this.ctx.resume();
+    });
   }
 
   ensure() {
@@ -28,8 +34,18 @@ export class Sound {
     this.on = on;
     if (this.ctx) {
       const t = this.ctx.currentTime;
-      this.master.gain.cancelScheduledValues(t);
-      this.master.gain.setTargetAtTime(on ? 1 : 0, t, 0.2);
+      const g = this.master.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      clearTimeout(this.sleep);
+      if (on) {
+        g.linearRampToValueAtTime(1, t + 0.35);
+      } else {
+        // Silence at once (a 60 ms ramp avoids a click), then stop the
+        // audio engine entirely so nothing can keep playing.
+        g.linearRampToValueAtTime(0, t + 0.06);
+        this.sleep = setTimeout(() => { if (!this.on) this.ctx.suspend(); }, 90);
+      }
     }
     return on;
   }
