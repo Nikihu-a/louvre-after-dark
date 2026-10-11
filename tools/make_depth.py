@@ -42,7 +42,7 @@ def run(model_path, image_path, out_path, long_side, dilate):
     out = out.resize((w, h), Image.BICUBIC)
     # A light blur hides stair-stepping without softening edges much.
     out = out.filter(ImageFilter.GaussianBlur(radius=max(w, h) / 1600))
-    out.save(out_path, optimize=True)
+    out.save(out_path, **({"lossless": True} if out_path.endswith(".webp") else {"optimize": True}))
     print(f"{image_path} -> {out_path} ({w}x{h}, inference {iw}x{ih})")
 
 

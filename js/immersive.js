@@ -29,6 +29,9 @@ const VERT = /* glsl */ `
 const FRAG = /* glsl */ `
   uniform sampler2D uImage;
   uniform sampler2D uDepth;
+  uniform sampler2D uPlate;    // background behind figure edges (inpainted)
+  uniform sampler2D uBgDepth;
+  uniform float uHasPlate;
   uniform vec2 uK;          // screen uv -> image uv scale
   uniform vec2 uPar;        // parallax offset (image uv)
   uniform float uFocus;
@@ -106,6 +109,27 @@ const FRAG = /* glsl */ `
     float du = depthAt(hit - vec2(0.0, e.y)), dd = depthAt(hit + vec2(0.0, e.y));
     vec3 n = normalize(vec3((dl - dr) * 7.0, (du - dd) * 7.0, 1.0));
 
+    // Disocclusion: the ray landed on the steep wall between a figure and what
+    // is behind it, and the view has actually moved. Re-trace against the
+    // background plate instead of stretching the figure's edge.
+    float wall = length(vec2(dr - dl, dd - du));
+    vec2 travel = (b - uA) * (1.0 / mag(1.0) - 1.0 / mag(0.0)) + uPar;
+    float wallK = uHasPlate * smoothstep(0.05, 0.2, wall) * smoothstep(0.0015, 0.008, length(travel));
+    if (wallK > 0.001) {
+      float hb = 1.0;
+      vec2 pb = at(b, hb);
+      float db = texture2D(uBgDepth, pb).r;
+      for (int i = 0; i < 20; i++) {
+        if (db >= hb) break;
+        hb -= 0.05;
+        pb = at(b, hb);
+        db = texture2D(uBgDepth, pb).r;
+      }
+      col = mix(col, texture2D(uPlate, pb).rgb, wallK);
+      hitH = mix(hitH, hb, wallK);
+      n = normalize(mix(n, vec3(0.0, 0.0, 1.0), wallK));
+    }
+
     vec3 pos = vec3(s * asp, hitH * 0.25);
     vec3 l = normalize(vec3(uLight * asp, 0.55) - pos);
     float diff = max(dot(n, l), 0.0);
@@ -146,6 +170,13 @@ export const mag = (h, zoom) => {
 };
 
 export class Immersive {
+  // Fewer ray-march steps for slower GPUs (forces a shader recompile).
+  setSteps(steps) {
+    if (this.material.defines.STEPS === steps) return;
+    this.material.defines.STEPS = steps;
+    this.material.needsUpdate = true;
+  }
+
   constructor(renderer, { steps = 48 } = {}) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
@@ -161,6 +192,9 @@ export class Immersive {
       uniforms: {
         uImage: { value: null },
         uDepth: { value: null },
+        uPlate: { value: null },
+        uBgDepth: { value: null },
+        uHasPlate: { value: 0 },
         uK: { value: new THREE.Vector2(1, 1) },
         uPar: { value: new THREE.Vector2() },
         uFocus: { value: 0.55 },
@@ -190,12 +224,15 @@ export class Immersive {
   }
 
   // Swap in a painting whose full-size textures are already loaded.
-  set(painting, image, depth, depthPixels) {
+  set(painting, { image, depth, plate, bgDepth }, depthPixels) {
     const u = this.material.uniforms;
     this.painting = painting;
     this.imgAspect = painting.aspect;
     u.uImage.value = image;
     u.uDepth.value = depth;
+    u.uPlate.value = plate || image;
+    u.uBgDepth.value = bgDepth || depth;
+    u.uHasPlate.value = plate && bgDepth ? 1 : 0;
     u.uFocus.value = painting.focus;
     u.uTint.value.setRGB(...painting.tint);
     u.uTexel.value.set(1 / depth.image.width, 1 / depth.image.height);

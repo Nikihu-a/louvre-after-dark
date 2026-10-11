@@ -1,6 +1,7 @@
 // The gallery: paintings as curved screens along an arc, over a perspective
-// grid floor. Positions along the strip are in world units ("s"); the scroll
-// position C is in painting indices and is mapped to s by stripAt().
+// grid floor that reflects them. Positions along the strip are in world units
+// ("s"); the scroll position C is in painting indices and is mapped to s by
+// stripAt().
 
 import * as THREE from "../vendor/three.module.min.js";
 
@@ -10,7 +11,7 @@ const RADIUS = 9.5;
 const FOV = 35;
 const CAM_Y = 0.62;
 const LOOK_Y = 0.12;
-const FLOOR_Y = -CARD_H / 2 - 0.55;
+const FLOOR_Y = -CARD_H / 2 - 0.14;
 
 const CARD_VERT = /* glsl */ `
   uniform float uOffset;   // strip position of the card center relative to the view
@@ -18,6 +19,9 @@ const CARD_VERT = /* glsl */ `
   uniform float uFocus;    // 0 = on the strip, 1 = flat and filling the screen
   uniform vec3 uFocusPos;
   uniform float uFocusScale;
+  uniform float uHover;
+  uniform float uReflect;  // 1 = draw the mirror image under the floor
+  uniform float uFloorY;
   varying vec2 vUv;
 
   void main() {
@@ -25,6 +29,9 @@ const CARD_VERT = /* glsl */ `
     float s = uOffset + position.x;
     float th = s / uRadius;
     vec3 strip = vec3(uRadius * sin(th), position.y, -uRadius * (1.0 - cos(th)));
+    // Hover: the card leans a touch toward the viewer.
+    strip += vec3(sin(th), 0.0, cos(th)) * uHover * 0.16;
+    strip.y = mix(strip.y, 2.0 * uFloorY - strip.y, uReflect);
     vec3 flat_ = uFocusPos + vec3(position.xy * uFocusScale, 0.0);
     vec3 wp = mix(strip, flat_, uFocus);
     gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
@@ -39,13 +46,18 @@ const CARD_FRAG = /* glsl */ `
   uniform float uActive;
   uniform float uAmbient;
   uniform float uLamp;
+  uniform float uPower;    // 0 = this card's light is off
+  uniform float uLoaded;
+  uniform float uHover;
   uniform vec3 uTint;
   uniform vec2 uLight;     // screen uv, y down
   uniform vec2 uRes;
   uniform float uGlare;
   uniform float uGlareAmt;
+  uniform float uVel;
   uniform float uVis;
   uniform float uFocus;
+  uniform float uReflect;
   varying vec2 vUv;
 
   float roundBox(vec2 p, vec2 b, float r) {
@@ -60,10 +72,19 @@ const CARD_FRAG = /* glsl */ `
     float mask = 1.0 - smoothstep(-aa, aa, d);
     if (mask <= 0.0) discard;
 
-    // Cheap one-tap depth parallax: enough to make the centered card breathe.
     float h = texture2D(uDepth, vUv).r;
-    vec2 uv = vUv + uPar * (h - uDepthFocus) * uActive;
-    vec3 col = texture2D(uMap, uv).rgb;
+    vec3 col;
+    if (uReflect > 0.5) {
+      // Blurred, like a reflection in polished stone.
+      col = texture2D(uMap, vUv, 3.0).rgb;
+    } else {
+      // Cheap one-tap depth parallax: enough to make the centered card breathe.
+      vec2 uv = vUv + uPar * (h - uDepthFocus) * uActive;
+      // Chromatic split while the strip is moving fast.
+      vec2 ca = vec2(clamp(uVel, -3.0, 3.0) * 0.0035, 0.0);
+      col = vec3(texture2D(uMap, uv + ca).r, texture2D(uMap, uv).g, texture2D(uMap, uv - ca).b);
+    }
+    col = mix(vec3(0.05, 0.045, 0.05), col, uLoaded);
 
     vec2 s = gl_FragCoord.xy / uRes;
     s.y = 1.0 - s.y;
@@ -72,17 +93,20 @@ const CARD_FRAG = /* glsl */ `
     float spot = exp(-dist * dist / 0.09);
 
     vec3 amb = mix(vec3(1.0), uTint, 0.35);
-    vec3 lit = col * (uAmbient * amb + uLamp * spot * uTint * (0.75 + 0.5 * h));
+    float ambient = mix(0.03, uAmbient, uPower) * (1.0 + 0.18 * uHover);
+    vec3 lit = col * (ambient * amb + uLamp * spot * uTint * (0.75 + 0.5 * h));
 
     // A diagonal sheen sweeping across the glass, strongest on the centered card.
     float band = s.x + (s.y - 0.5) * 0.35 - uGlare;
-    lit += vec3(1.0, 0.96, 0.9) * exp(-band * band * 60.0) * uGlareAmt * (0.25 + 0.75 * uActive) * (1.0 - uFocus);
+    lit += vec3(1.0, 0.96, 0.9) * exp(-band * band * 60.0) * uGlareAmt * (0.25 + 0.75 * uActive) * (1.0 - uFocus) * uPower * (1.0 - uReflect);
 
     // Soft inner edge so cards read as lit screens rather than flat cutouts.
     float edge = smoothstep(0.0, 0.06, -d);
     lit *= mix(0.55, 1.0, mix(edge, 1.0, uFocus));
 
-    gl_FragColor = vec4(lit * uVis, mask * uVis);
+    float alpha = mask * uVis;
+    if (uReflect > 0.5) alpha *= 0.3 * smoothstep(0.7, 0.0, vUv.y);
+    gl_FragColor = vec4(lit * uVis, alpha);
   }`;
 
 const FLOOR_VERT = /* glsl */ `
@@ -93,6 +117,7 @@ const FLOOR_VERT = /* glsl */ `
     gl_Position = projectionMatrix * viewMatrix * w;
   }`;
 
+// Drawn additively over the reflections: grid lines and a warm pool of light.
 const FLOOR_FRAG = /* glsl */ `
   uniform float uScroll;
   uniform vec3 uTint;
@@ -130,19 +155,24 @@ function dustTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+function solidTexture(v) {
+  const t = new THREE.DataTexture(new Uint8Array([v, v, v, 255]), 1, 1);
+  t.needsUpdate = true;
+  return t;
+}
+
 export class Gallery {
-  constructor(renderer, paintings, textures) {
+  constructor(renderer, paintings) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
     this.camZ = 9;
     this.res = new THREE.Vector2(1, 1);
-    const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const blank = solidTexture(20), flat = solidTexture(128);
 
-    this.cards = paintings.map((p, i) => {
+    this.cards = paintings.map((p) => {
       const w = CARD_H * p.aspect;
-      const { map, depth } = textures[i];
-      map.anisotropy = aniso;
       const mat = new THREE.ShaderMaterial({
         vertexShader: CARD_VERT,
         fragmentShader: CARD_FRAG,
@@ -154,26 +184,41 @@ export class Gallery {
           uFocus: { value: 0 },
           uFocusPos: { value: new THREE.Vector3() },
           uFocusScale: { value: 1 },
-          uMap: { value: map },
-          uDepth: { value: depth },
+          uHover: { value: 0 },
+          uReflect: { value: 0 },
+          uFloorY: { value: FLOOR_Y },
+          uMap: { value: blank },
+          uDepth: { value: flat },
           uAspect: { value: p.aspect },
           uPar: { value: new THREE.Vector2() },
           uDepthFocus: { value: p.focus },
           uActive: { value: 0 },
           uAmbient: { value: 0.5 },
           uLamp: { value: 0.5 },
+          uPower: { value: 1 },
+          uLoaded: { value: 0 },
           uTint: { value: new THREE.Color(...p.tint) },
           uLight: { value: new THREE.Vector2(0.5, 0.5) },
           uRes: { value: this.res },
           uGlare: { value: 0.5 },
           uGlareAmt: { value: 0.1 },
+          uVel: { value: 0 },
           uVis: { value: 1 },
         },
       });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, CARD_H, 72, 1), mat);
-      mesh.frustumCulled = false;
-      this.scene.add(mesh);
-      return { mesh, mat, w, s: 0, offset: 0, vis: 1, active: 0 };
+      // The reflection shares every uniform except uReflect.
+      const reflMat = mat.clone();
+      reflMat.uniforms = { ...mat.uniforms, uReflect: { value: 1 } };
+      reflMat.depthTest = false;
+      reflMat.side = THREE.DoubleSide; // mirroring flips the triangle winding
+
+      const geo = new THREE.PlaneGeometry(w, CARD_H, 72, 1);
+      const mesh = new THREE.Mesh(geo, mat);
+      const refl = new THREE.Mesh(geo, reflMat);
+      mesh.frustumCulled = refl.frustumCulled = false;
+      refl.renderOrder = -2;
+      this.scene.add(refl, mesh);
+      return { mesh, refl, mat, w, s: 0, offset: 0, vis: 1, active: 0, hover: 0, loadedAt: -1 };
     });
     let s = 0;
     this.cards.forEach((c, i) => {
@@ -184,6 +229,9 @@ export class Gallery {
     this.floorMat = new THREE.ShaderMaterial({
       vertexShader: FLOOR_VERT,
       fragmentShader: FLOOR_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
       uniforms: {
         uScroll: { value: 0 },
         uTint: { value: new THREE.Color(1, 0.85, 0.6) },
@@ -219,6 +267,15 @@ export class Gallery {
 
   get count() { return this.cards.length; }
 
+  // Swap in a card's real textures once they arrive; it fades up from dark.
+  setTextures(i, map, depth, now) {
+    const c = this.cards[i];
+    map.anisotropy = this.aniso;
+    c.mat.uniforms.uMap.value = map;
+    c.mat.uniforms.uDepth.value = depth;
+    c.loadedAt = now;
+  }
+
   // Scroll position (painting index, may run past either end) -> strip position.
   stripAt(C) {
     const cards = this.cards, n = cards.length;
@@ -249,7 +306,8 @@ export class Gallery {
     const s = u.uOffset.value + lx;
     const R = u.uRadius.value;
     const th = s / R;
-    const strip = out.set(R * Math.sin(th), ly, -R * (1 - Math.cos(th)));
+    const hv = u.uHover.value * 0.16;
+    const strip = out.set(R * Math.sin(th) + Math.sin(th) * hv, ly, -R * (1 - Math.cos(th)) + Math.cos(th) * hv);
     const f = u.uFocus.value;
     if (f > 0) {
       const fp = u.uFocusPos.value, sc = u.uFocusScale.value;
@@ -288,29 +346,39 @@ export class Gallery {
     return { pos: new THREE.Vector3(0, CAM_Y, this.camZ - D), scale: (screenHeights * visH) / CARD_H };
   }
 
+  // st: { C, vel, time, now, mouse, light, ambient, lamp, tint, power[], hover,
+  //       focusIndex, focusT, focusFit, focusAmbient, focusLamp, cardsVis, floorVis, pull }
   update(st) {
     const S = this.stripAt(st.C);
     const R = RADIUS / (1 + Math.min(Math.abs(st.vel) * 0.22, 1.1));
     const ft = st.focusT;
     const fe = ft * ft * (3 - 2 * ft);
 
+    // `pull` > 1 backs the camera away and up (the opening dolly).
+    const pull = st.pull;
     const cam = this.camera;
-    cam.position.set(st.mouse[0] * 0.18 * (1 - fe), CAM_Y + st.mouse[1] * -0.08 * (1 - fe), this.camZ);
-    cam.lookAt(0, lerp(LOOK_Y, CAM_Y, fe), 0);
+    cam.position.set(st.mouse[0] * 0.18 * (1 - fe), CAM_Y + st.mouse[1] * -0.08 * (1 - fe) + (pull - 1) * 1.1, this.camZ * pull);
+    cam.lookAt(0, lerp(LOOK_Y, CAM_Y, fe) - (pull - 1) * 0.25, 0);
 
     const focus = st.focusIndex >= 0 ? this.focusTarget(st.focusFit) : null;
     const glare = 0.5 + Math.sin(st.time * 0.25) * 0.25 + st.mouse[0] * 0.15 - st.vel * 0.08;
+    let poolPower = 0;
 
     this.cards.forEach((c, i) => {
       const u = c.mat.uniforms;
       c.offset = c.s - S;
       const th = Math.abs(c.offset) / R;
-      c.vis = smoothstep(1.75, 1.1, th);
+      // During the opening dolly the camera sees further round the arc.
+      const reach = (pull - 1) * 0.9;
+      c.vis = smoothstep(1.75 + reach, 1.1 + reach, th);
       c.active = clamp01(1 - Math.abs(c.offset) / (0.55 * (c.w + GAP)));
+      c.hover = lerp(c.hover, st.hover === i ? 1 : 0, 0.12);
       const isFocus = i === st.focusIndex;
       const vis = c.vis * (isFocus ? 1 : 1 - fe) * st.cardsVis;
+      poolPower += st.power[i] * c.active;
 
       c.mesh.visible = vis > 0.002;
+      c.refl.visible = c.mesh.visible && !isFocus;
       if (!c.mesh.visible) return;
       u.uOffset.value = c.offset;
       u.uRadius.value = R;
@@ -319,13 +387,17 @@ export class Gallery {
         u.uFocusPos.value.copy(focus.pos);
         u.uFocusScale.value = focus.scale;
       }
+      u.uHover.value = c.hover * (1 - fe);
       u.uPar.value.set(st.mouse[0] * 0.012, -st.mouse[1] * 0.009);
       u.uActive.value = isFocus ? lerp(c.active, 0, fe) : c.active;
       u.uAmbient.value = lerp(st.ambient * (0.45 + 0.55 * c.active), st.focusAmbient, isFocus ? fe : 0);
       u.uLamp.value = lerp(st.lamp, st.focusLamp, isFocus ? fe : 0);
+      u.uPower.value = isFocus ? lerp(st.power[i], 1, fe) : st.power[i];
+      u.uLoaded.value = c.loadedAt < 0 ? 0 : clamp01((st.now - c.loadedAt) / 600);
       u.uLight.value.set(st.light[0], st.light[1]);
       u.uGlare.value = glare;
       u.uGlareAmt.value = 0.08 + Math.min(Math.abs(st.vel) * 0.05, 0.12);
+      u.uVel.value = isFocus ? 0 : st.vel;
       u.uVis.value = vis;
       // Keep the focused card above its neighbours while it flies forward.
       c.mesh.renderOrder = isFocus ? 2 : 1;
@@ -334,7 +406,7 @@ export class Gallery {
     const fu = this.floorMat.uniforms;
     fu.uScroll.value = S;
     fu.uTint.value.setRGB(...st.tint);
-    fu.uPool.value = st.ambient * 1.6;
+    fu.uPool.value = st.ambient * 1.6 * clamp01(poolPower);
     fu.uFade.value = (1 - fe) * st.floorVis;
 
     const p = this.dust.geometry.attributes.position;

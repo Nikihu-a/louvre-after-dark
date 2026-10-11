@@ -11,8 +11,8 @@
   --ink-faint: rgba(243, 234, 219, 0.32);
   --gold: #d9b26f;
   --night: #07060a;
-  --serif: "Cormorant", "Times New Roman", serif;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --serif: "Cormorant", "Times New Roman", "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --gutter: clamp(16px, 4vw, 56px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -100,6 +100,7 @@ h1 em, h2 em {
   text-transform: uppercase;
   transition: background 0.3s, border-color 0.3s;
 }
+.pill b { font-weight: inherit; }
 .pill span {
   display: grid;
   place-items: center;
@@ -169,7 +170,7 @@ h1 em, h2 em {
   color: var(--gold);
   margin-left: 0.4em;
 }
-.lights {
+.toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -179,14 +180,28 @@ h1 em, h2 em {
   color: var(--ink-dim);
   padding: 6px 2px;
 }
-.lights-dot {
+.toggle-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   border: 1px solid var(--gold);
   transition: background 0.3s, box-shadow 0.3s;
 }
-.lights[aria-pressed="true"] .lights-dot { background: #ffe2aa; box-shadow: 0 0 10px rgba(255, 220, 160, 0.9); }
-.lights:hover { color: var(--ink); }
+.toggle[aria-pressed="true"] .toggle-dot { background: #ffe2aa; box-shadow: 0 0 10px rgba(255, 220, 160, 0.9); }
+.toggle:hover, .lang:hover { color: var(--ink); }
+.toggle-icon { display: none; width: 20px; height: 20px; color: var(--ink-dim); }
+.toggle[aria-pressed="true"] .toggle-icon { color: #ffe2aa; filter: drop-shadow(0 0 6px rgba(255, 220, 160, 0.8)); }
+.toggle[aria-pressed="false"] .wave { opacity: 0.25; }
+.lang {
+  font-family: var(--serif);
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+  width: 30px; height: 30px;
+  border: 1px solid var(--ink-faint);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
 
 /* ---------- intro ---------- */
 .intro {
@@ -220,7 +235,10 @@ h1 em, h2 em {
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.hint span { color: var(--ink-faint); }
+.hint i { font-style: normal; color: var(--gold); margin: 0 0.4em; }
+.hint .quiet { color: var(--ink-faint); }
+.intro .hint { transition: opacity 0.6s; }
+.intro.entered .hint { opacity: 0; }
 
 /* ---------- gallery card captions ---------- */
 .cards-ui { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
@@ -452,7 +470,7 @@ h1 em, h2 em {
   place-items: center;
   box-shadow: 0 0 18px rgba(217, 178, 111, 0.45);
   opacity: 0;
-  transition: opacity 0.5s, background 0.3s, color 0.3s, scale 0.3s var(--ease);
+  transition: opacity 0.5s, background 0.3s, color 0.3s, box-shadow 0.3s;
 }
 .hotspot::after {
   content: "";
@@ -463,7 +481,8 @@ h1 em, h2 em {
   animation: ping 2.2s ease-out infinite;
   pointer-events: none;
 }
-.hotspot:hover, .hotspot.on { background: var(--gold); color: #111; scale: 1.15; }
+/* No scale here: it would also scale the JS translate that positions the marker. */
+.hotspot:hover, .hotspot.on { background: var(--gold); color: #111; box-shadow: 0 0 0 4px rgba(217, 178, 111, 0.25), 0 0 26px rgba(217, 178, 111, 0.8); }
 @keyframes ping {
   from { transform: scale(1); opacity: 0.9; }
   to { transform: scale(2.6); opacity: 0; }
@@ -646,13 +665,46 @@ h1 em, h2 em {
 
 /* Fallback without WebGL 2: the wall is the whole site. */
 .no-webgl .wall { opacity: 1 !important; visibility: visible !important; }
-.no-webgl #gl, .no-webgl .scrub, .no-webgl .intro, .no-webgl .lights { display: none; }
+.no-webgl #gl, .no-webgl .scrub, .no-webgl .intro, .no-webgl .toggle { display: none; }
+
+.lost {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 6, 10, 0.86);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--gold);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s, visibility 0.4s;
+}
+.lost.on { opacity: 1; visibility: visible; }
+
+/* Chinese: tighter display sizes and a little tracking for CJK serifs. */
+:lang(zh) .intro h1 { font-size: clamp(34px, 5.4vw, 76px); letter-spacing: 0.06em; line-height: 1.2; }
+:lang(zh) .card-cap h2 { font-size: 36px; letter-spacing: 0.06em; }
+:lang(zh) .view-title .sub, :lang(zh) .view-detail h3 { letter-spacing: 0.06em; }
+:lang(zh) .view-detail h3 { font-size: 26px; }
+:lang(zh) .view-next h2, :lang(zh) .wall h2 { letter-spacing: 0.06em; line-height: 1.2; }
+:lang(zh) .view-title .lead, :lang(zh) .view-detail p:last-child { line-height: 1.85; }
+:lang(zh) .hint, :lang(zh) .toggle, :lang(zh) .view-back, :lang(zh) .pill { letter-spacing: 0.12em; }
+:lang(zh) .card-year .e { letter-spacing: 0.08em; }
+/* CJK has no italic: browsers fake it by slanting, so keep Chinese upright. */
+:lang(zh) .eyebrow, :lang(zh) .num, :lang(zh) .card-cap p, :lang(zh) .view-title .sub b,
+:lang(zh) .card-year .e, :lang(zh) h1 em, :lang(zh) h2 em, :lang(zh) .wall-grid .y, :lang(zh) .lost { font-style: normal; }
 
 /* ---------- small screens ---------- */
 @media (max-width: 760px) {
   .topbar .tag { font-size: 0; }
   .topbar .tag em { font-size: 15px; margin: 0; }
-  .topbar-right { gap: 14px; }
+  .topbar-right { gap: 12px; }
+  .toggle-label, .toggle-dot { display: none; }
+  .toggle-icon { display: block; }
+  .toggle { padding: 6px 2px; }
   .scrub li button { font-size: 0; padding-top: 10px; }
   .scrub li button.on { font-size: 12px; }
   .view-title .lead { display: none; }
@@ -666,6 +718,10 @@ h1 em, h2 em {
   .view-back kbd { display: none; }
   .wall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 16px; }
   .wall-grid img { height: 120px; }
+}
+
+@media (max-height: 560px) {
+  .card-year .e { display: none; }
 }
 
 @media (max-height: 640px) {

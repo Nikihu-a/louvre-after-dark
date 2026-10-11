@@ -1,5 +1,7 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { PAINTINGS } from "./data.js";
+import { UI, ZH } from "./i18n.js";
+import { Sound } from "./audio.js";
 import { Gallery, CARD_H } from "./gallery.js";
 import { Immersive, PARALLAX, fitHeight } from "./immersive.js";
 
@@ -24,6 +26,30 @@ const LIGHT = {
   on: { gallery: [1.0, 0.12], overview: [1.0, 0.12], detail: [0.95, 0.12], next: [0.85, 0.12] },
 };
 
+// Opening: how far back the camera starts, where along the arc it looks
+// (the middle of the collection), and when each spotlight switches on.
+const PULL = 2.4;
+const OPENING_C = 4.5;
+const lightDelay = (i) => (reduceMotion ? 0.3 + i * 0.05 : 0.4 + i * 0.12);
+const OPENING = reduceMotion ? 1.2 : 3.2;
+
+// A spotlight that catches, drops out, and catches again.
+function powerAt(i, t) {
+  const x = t - lightDelay(i);
+  if (x < 0) return 0;
+  if (reduceMotion) return 1;
+  if (x < 0.05) return 0.9;
+  if (x < 0.11) return 0.08;
+  if (x < 0.16) return 1;
+  if (x < 0.21) return 0.55;
+  return 1;
+}
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
+
 // ---------------------------------------------------------------- tweens
 const tweens = new Set();
 function tween(seconds, onUpdate, onDone) {
@@ -42,11 +68,34 @@ function runTweens(now) {
   }
 }
 
+// ---------------------------------------------------------------- language
+let lang = store.get("lad-lang") === "zh" ? "zh" : "en";
+const L = () => UI[lang];
+// Painting texts in the current language.
+const text = (p) => {
+  if (lang !== "zh") return p;
+  const z = ZH[p.id];
+  return { ...p, ...z, hotspots: p.hotspots.map((h, k) => ({ ...h, ...z.hotspots[k] })) };
+};
+const langListeners = [];
+function applyLang() {
+  const u = L();
+  document.documentElement.lang = u.lang;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const v = u[el.dataset.i18n];
+    if (typeof v === "string") el.textContent = v;
+  });
+  const btn = $("#lang");
+  btn.textContent = u.toggle;
+  btn.setAttribute("aria-label", u.toggleLabel);
+  langListeners.forEach((f) => f());
+}
+
 // ---------------------------------------------------------------- DOM
-const el = (tag, cls, text) => {
+const el = (tag, cls, txt) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
+  if (txt != null) e.textContent = txt;
   return e;
 };
 
@@ -55,22 +104,35 @@ const ui = {
   intro: $("#intro"), cards: $("#cards-ui"), scrub: $("#scrub"), scrubTrack: $("#scrub-track"),
   scrubList: $("#scrub-list"), scrubDot: $("#scrub-dot"),
   view: $("#view"), hotspots: $("#hotspots"), chapters: $("#chapters"), wall: $("#wall"), wallGrid: $("#wall-grid"),
-  cursor: $("#cursor"), cursorLabel: $("#cursor-label"), lights: $("#lights"), announce: $("#announce"),
+  cursor: $("#cursor"), cursorLabel: $("#cursor-label"), lights: $("#lights"), sound: $("#sound"),
+  lang: $("#lang"), lost: $("#lost"), announce: $("#announce"),
 };
 
-// Wall (also the no-WebGL fallback).
-PAINTINGS.forEach((p, i) => {
+// Wall (also the fallback without WebGL).
+const wallTitles = PAINTINGS.map((p, i) => {
   const li = el("li");
   const b = el("button");
   b.type = "button";
   const img = el("img");
-  img.src = `assets/paintings/${p.id}-card.jpg`;
-  img.alt = `${p.title}, ${p.artist}`;
+  img.src = `assets/paintings/${p.id}-card.webp`;
   img.loading = "lazy";
-  b.append(img, el("span", "y", p.date), el("span", "t", p.title));
+  const t = el("span", "t");
+  b.append(img, el("span", "y", p.date), t);
   b.addEventListener("click", () => openPainting(i));
   li.append(b);
   ui.wallGrid.append(li);
+  return { img, t };
+});
+langListeners.push(() => PAINTINGS.forEach((p, i) => {
+  const tp = text(p);
+  wallTitles[i].t.textContent = tp.title;
+  wallTitles[i].img.alt = `${tp.title}, ${tp.artist}`;
+}));
+
+ui.lang.addEventListener("click", () => {
+  lang = lang === "en" ? "zh" : "en";
+  store.set("lad-lang", lang);
+  applyLang();
 });
 
 function noWebGL() {
@@ -79,20 +141,29 @@ function noWebGL() {
   ui.loader.classList.add("done");
 }
 
-// ---------------------------------------------------------------- renderer
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ canvas: $("#gl"), antialias: true, powerPreference: "high-performance" });
-} catch (err) {
-  console.error(err);
-  noWebGL();
-}
+let openPainting = () => {};
 
+// ---------------------------------------------------------------- renderer
+let renderer = null;
+if (new URLSearchParams(location.search).has("static")) noWebGL();
+else {
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: $("#gl"), antialias: true, powerPreference: "high-performance" });
+  } catch (err) {
+    console.error(err);
+    noWebGL();
+  }
+}
+applyLang();
 if (renderer) start();
 
 function start() {
   renderer.setClearColor(0x07060a, 1);
   renderer.autoClear = false;
+
+  const canvas = renderer.domElement;
+  canvas.addEventListener("webglcontextlost", () => ui.lost.classList.add("on"));
+  canvas.addEventListener("webglcontextrestored", () => ui.lost.classList.remove("on"));
 
   const texLoader = new THREE.TextureLoader();
   const loadTexture = (url, { flipY = true, mipmaps = true } = {}) => new Promise((res, rej) => {
@@ -116,100 +187,135 @@ function start() {
     return { w: c.width, h: c.height, data: g.getImageData(0, 0, c.width, c.height).data };
   };
 
+  // Gallery card textures, in priority order: the first paintings (or a deep
+  // link's) gate the loader; the rest stream in behind it.
+  const deep = PAINTINGS.findIndex((p) => p.id === location.hash.replace(/^#\/?/, ""));
+  const first = deep >= 0 ? [deep, deep + 1, deep - 1].filter((i) => i >= 0 && i < N) : [0, 1, 2, 3];
+  const order = [...first, ...PAINTINGS.map((_, i) => i).filter((i) => !first.includes(i))];
+  const cardCache = new Map();
+  const loadCard = (i) => {
+    if (!cardCache.has(i)) {
+      const p = PAINTINGS[i];
+      cardCache.set(i, Promise.all([
+        loadTexture(`assets/paintings/${p.id}-card.webp`),
+        loadTexture(`assets/paintings/${p.id}-depth-sm.webp`, { mipmaps: false }),
+      ]).then(([map, depth]) => ({ map, depth, pixels: readPixels(depth.image) })));
+    }
+    return cardCache.get(i);
+  };
+
   // Full-size textures for the immersive view, loaded on demand.
   const full = new Map();
   const loadFull = (i) => {
     if (!full.has(i)) {
       const p = PAINTINGS[i];
+      const opt = { flipY: false, mipmaps: false };
+      const optional = (url) => loadTexture(url, opt).catch(() => null);
       const pr = Promise.all([
-        loadTexture(`assets/paintings/${p.id}.jpg`, { flipY: false, mipmaps: false }),
-        loadTexture(`assets/paintings/${p.id}-depth.png`, { flipY: false, mipmaps: false }),
-      ]);
+        loadTexture(`assets/paintings/${p.id}.webp`, opt),
+        loadTexture(`assets/paintings/${p.id}-depth.webp`, opt),
+        optional(`assets/paintings/${p.id}-plate.webp`),
+        optional(`assets/paintings/${p.id}-bgdepth.webp`),
+        loadCard(i),
+      ]).then(([image, depth, plate, bgDepth, card]) => ({ image, depth, plate, bgDepth, pixels: card.pixels }));
       pr.catch(() => full.delete(i));
       full.set(i, pr);
     }
     return full.get(i);
   };
 
-  // Gallery textures, with a progress readout.
-  let loaded = 0;
-  const total = N * 2;
+  let done = 0;
   const tick = () => {
-    loaded++;
-    const p = loaded / total;
+    done++;
+    const p = done / first.length;
     ui.loaderPct.textContent = `${Math.round(p * 100)}%`;
     ui.loaderBar.style.transform = `scaleX(${p})`;
     ui.loader.style.setProperty("--p", p.toFixed(3));
   };
-  const cardTex = PAINTINGS.map((p) => Promise.all([
-    loadTexture(`assets/paintings/${p.id}-card.jpg`).then((t) => (tick(), t)),
-    loadTexture(`assets/paintings/${p.id}-depth-sm.png`, { mipmaps: false }).then((t) => (tick(), t)),
-  ]));
-
-  Promise.all(cardTex).then((list) => {
-    const textures = list.map(([map, depth]) => ({ map, depth }));
-    const depthPixels = list.map(([, depth]) => readPixels(depth.image));
-    run(textures, depthPixels, loadFull);
+  Promise.all(first.map((i) => loadCard(i).then((c) => (tick(), c)))).then(() => {
+    run(loadCard, loadFull, order, deep);
   }).catch((err) => {
     console.error(err);
-    ui.loader.querySelector(".loader-text").textContent = "The gallery could not be lit. Please reload.";
+    ui.loader.querySelector(".loader-text").textContent = L().loadError;
   });
 }
 
 // ---------------------------------------------------------------- app
-let openPainting = () => {};
+function run(loadCard, loadFull, order, deep) {
+  const gallery = new Gallery(renderer, PAINTINGS);
+  const sound = new Sound();
+  const baseDpr = Math.min(devicePixelRatio || 1, finePointer ? 1.75 : 1.5);
+  const TIERS = [
+    { dpr: baseDpr, steps: finePointer ? 48 : 32 },
+    { dpr: Math.min(baseDpr, 1.25), steps: 36 },
+    { dpr: 1, steps: 28 },
+    { dpr: 0.75, steps: 20 },
+  ];
+  const immersive = new Immersive(renderer, { steps: TIERS[0].steps });
 
-function run(textures, depthPixels, loadFull) {
-  const gallery = new Gallery(renderer, PAINTINGS, textures);
-  const immersive = new Immersive(renderer, { steps: finePointer ? 48 : 28 });
+  // Stream card textures in, nearest first.
+  (async () => {
+    for (const i of order) {
+      try {
+        const c = await loadCard(i);
+        gallery.setTextures(i, c.map, c.depth, performance.now());
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  })();
 
   const S = {
     mode: "gallery", // gallery | entering | view | leaving | switching
-    T: -1, C: -1, vel: 0,
+    opening: deep >= 0 ? "done" : "waiting", // waiting | playing | done
+    openingT0: 0, clicked: new Array(N).fill(0),
+    power: new Array(N).fill(deep >= 0 ? 1 : 0), pull: deep >= 0 ? 1 : PULL,
+    T: deep >= 0 ? -1 : OPENING_C, C: deep >= 0 ? -1 : OPENING_C, vel: 0, introO: 1,
     tx: 0, ty: 0, px: 0, py: 0,
     tlx: 0.5, tly: 0.45, lx: 0.5, ly: 0.45,
     cx: innerWidth / 2, cy: innerHeight / 2, ccx: innerWidth / 2, ccy: innerHeight / 2,
     lastMove: -1e9, lastInput: -1e9, tilt: null,
     focusIndex: -1, focusT: 0, pendingOpen: -1,
     viewOpacity: 0, current: 0, chapter: 0,
-    lights: "lamp",
+    lights: "lamp", hover: -1,
     cam: { zoom: 0, cx: 0.5, cy: 0.5, ambient: 0.6, lamp: 0.55 }, camLock: false,
     loupe: [0.5, 0.5], loupeK: 0, loupeTarget: 0,
     thresh: -0.2, invert: 0,
     wheelAcc: 0, lastStep: 0,
     announced: -2,
+    tier: 0, frameMs: 16.7, tierAt: 0,
   };
 
   // ------------------------------------------------ captions & timeline DOM
   const cardEls = PAINTINGS.map((p, i) => {
     const cap = el("div", "card-cap");
-    cap.append(el("p", null, p.artist), el("h2", null, p.title));
+    const artist = el("p");
+    const title = el("h2");
+    cap.append(artist, title);
     const btn = el("button", "card-open");
     btn.type = "button";
-    btn.setAttribute("aria-label", `Open ${p.title}`);
     btn.innerHTML = '<span aria-hidden="true">→</span>';
     btn.addEventListener("click", () => openPainting(i));
     const year = el("p", "card-year");
-    year.append(el("span", "y", p.date), el("span", "e", p.era));
+    const era = el("span", "e");
+    year.append(el("span", "y", p.date), era);
     ui.cards.append(cap, btn, year);
-    return { cap, btn, year };
+    return { cap, btn, year, artist, title, era };
   });
 
   const scrubBtns = PAINTINGS.map((p, i) => {
     const li = el("li");
     const b = el("button", null, String(p.year));
     b.type = "button";
-    b.setAttribute("aria-label", `${p.date}, ${p.title}`);
-    b.addEventListener("click", () => { S.T = i; S.lastInput = performance.now(); });
+    b.addEventListener("click", () => { if (S.opening === "done") { S.T = i; S.lastInput = performance.now(); } });
     li.append(b);
     ui.scrubList.append(li);
     return b;
   });
 
-  const chapterBtns = ["Overview", "Detail 1", "Detail 2", "Detail 3", "Next"].map((label, c) => {
+  const chapterBtns = [0, 1, 2, 3, 4].map((c) => {
     const b = el("button");
     b.type = "button";
-    b.setAttribute("aria-label", label);
     b.addEventListener("click", () => setChapter(c));
     ui.chapters.append(b);
     return b;
@@ -217,38 +323,62 @@ function run(textures, depthPixels, loadFull) {
 
   let hotspotBtns = [];
 
+  function labelGallery() {
+    const u = L();
+    PAINTINGS.forEach((p, i) => {
+      const tp = text(p);
+      cardEls[i].artist.textContent = tp.artist;
+      cardEls[i].title.textContent = tp.title;
+      cardEls[i].era.textContent = tp.era;
+      cardEls[i].btn.setAttribute("aria-label", u.open(tp.title));
+      scrubBtns[i].setAttribute("aria-label", `${p.date}, ${tp.title}`);
+    });
+    chapterBtns.forEach((b, c) => b.setAttribute("aria-label", u.chapters[c]));
+    labelToggles();
+    ui.lights.title = u.lightsTitle;
+  }
+  langListeners.push(labelGallery);
+  langListeners.push(() => {
+    if (S.viewOpacity > 0) {
+      fillView(S.current);
+      setChapter(S.chapter, true);
+    }
+  });
+  labelGallery();
+
   // ------------------------------------------------ view content
   function fillView(i) {
-    const p = PAINTINGS[i];
+    const u = L();
+    const p = text(PAINTINGS[i]);
     $("#v-eyebrow").textContent = `${p.date} · ${p.era}`;
     $("#v-original").textContent = p.original;
     $("#v-title").textContent = p.title;
     $("#v-artist").textContent = p.artist;
     $("#v-lead").textContent = p.lead;
-    $("#v-meta").textContent = `${p.artist}, ${p.original}, ${p.date} · ${p.medium} · ${p.size} · Musée du Louvre, ${p.inv}`;
+    $("#v-meta").textContent = u.meta(p, p.inv);
     const next = PAINTINGS[i + 1];
-    $("#n-eyebrow").textContent = next ? `Next · ${next.date}` : "End of the timeline";
-    $("#n-title").textContent = next ? next.title : "The collection";
-    $("#n-go").firstChild.textContent = next ? "Continue " : "Leave the gallery ";
+    $("#n-eyebrow").textContent = next ? u.next(next.date) : u.endEyebrow;
+    $("#n-title").textContent = next ? text(next).title : u.endTitle;
+    $("#n-go-label").textContent = next ? u.continue : u.leave;
 
     ui.hotspots.textContent = "";
     hotspotBtns = p.hotspots.map((h, k) => {
       const b = el("button", "hotspot", String(k + 1));
       b.type = "button";
-      b.setAttribute("aria-label", `Detail ${k + 1}: ${h.title}`);
+      b.setAttribute("aria-label", u.detailLabel(k + 1, h.title));
       b.addEventListener("click", () => setChapter(k + 1));
       ui.hotspots.append(b);
       return b;
     });
   }
 
-  function setChapter(c) {
+  function setChapter(c, quiet) {
     c = clamp(c, 0, 4);
     S.chapter = c;
-    const p = PAINTINGS[S.current];
+    const p = text(PAINTINGS[S.current]);
     if (c >= 1 && c <= 3) {
       const h = p.hotspots[c - 1];
-      $("#d-num").textContent = `0${c} / 03`;
+      $("#d-num").textContent = L().detailOf(c);
       $("#d-title").textContent = h.title;
       $("#d-text").textContent = h.text;
     }
@@ -258,32 +388,62 @@ function run(textures, depthPixels, loadFull) {
     });
     // Restart the detail card's entrance when stepping between details.
     const detail = ui.view.querySelector(".view-detail");
-    if (c >= 1 && c <= 3) {
+    if (c >= 1 && c <= 3 && !quiet) {
       detail.classList.remove("on");
       void detail.offsetWidth;
       detail.classList.add("on");
     }
     chapterBtns.forEach((b, k) => b.classList.toggle("on", k === c));
     hotspotBtns.forEach((b, k) => b.classList.toggle("on", k === c - 1));
-    if (c >= 1 && c <= 3) announce(p.hotspots[c - 1].title);
+    if (c >= 1 && c <= 3 && !quiet) announce(p.hotspots[c - 1].title);
   }
 
   function viewTarget() {
-    const L = LIGHT[S.lights];
+    const Lt = LIGHT[S.lights];
     const p = PAINTINGS[S.current];
-    if (S.chapter === 0) return { zoom: 0.04, cx: 0.5, cy: 0.5, ambient: L.overview[0], lamp: L.overview[1] };
+    if (S.chapter === 0) return { zoom: 0.04, cx: 0.5, cy: 0.5, ambient: Lt.overview[0], lamp: Lt.overview[1] };
     if (S.chapter <= 3) {
       const h = p.hotspots[S.chapter - 1];
-      return { zoom: h.zoom, cx: h.x, cy: h.y, ambient: L.detail[0], lamp: L.detail[1] };
+      return { zoom: h.zoom, cx: h.x, cy: h.y, ambient: Lt.detail[0], lamp: Lt.detail[1] };
     }
-    return { zoom: 0, cx: 0.5, cy: 0.5, ambient: L.next[0], lamp: L.next[1] };
+    return { zoom: 0, cx: 0.5, cy: 0.5, ambient: Lt.next[0], lamp: Lt.next[1] };
   }
 
-  const announce = (text) => { ui.announce.textContent = text; };
+  const announce = (msg) => { ui.announce.textContent = msg; };
+  const describe = (i) => {
+    const p = text(PAINTINGS[i]);
+    return `${p.date}: ${p.title}, ${p.artist}`;
+  };
+
+  // ------------------------------------------------ opening
+  function startOpening(withSound) {
+    if (S.opening !== "waiting") return;
+    if (withSound) setSound(true);
+    S.opening = "playing";
+    S.openingT0 = performance.now();
+    // Dolly in while swinging back round the arc to the first painting.
+    tween(OPENING, (k) => {
+      const e = easeInOut(k);
+      S.pull = lerp(PULL, 1, e);
+      S.T = S.C = lerp(OPENING_C, 0, e);
+      S.introO = 1 - smoothstep(0, 0.18, k);
+    }, () => {
+      S.T = S.C = 0;
+      S.opening = "done";
+      S.power.fill(1);
+      ui.intro.classList.add("entered");
+    });
+  }
 
   // ------------------------------------------------ transitions
   openPainting = (i) => {
     if (S.mode !== "gallery") return;
+    if (S.opening !== "done") {
+      S.opening = "done";
+      S.power.fill(1);
+      S.pull = 1;
+      ui.intro.classList.add("entered");
+    }
     if (Math.abs(S.C - i) < 0.03) enter(i);
     else {
       S.T = i;
@@ -312,7 +472,7 @@ function run(textures, depthPixels, loadFull) {
         return;
       }
       const ov = LIGHT[S.lights].overview;
-      immersive.set(PAINTINGS[i], tex[0], tex[1], depthPixels[i]);
+      immersive.set(PAINTINGS[i], tex, tex.pixels);
       Object.assign(S.cam, { zoom: 0, cx: 0.5, cy: 0.5, ambient: ov[0], lamp: ov[1] });
       S.thresh = -0.2;
       S.invert = 0;
@@ -325,7 +485,7 @@ function run(textures, depthPixels, loadFull) {
         if (i + 1 < N) loadFull(i + 1);
       });
       setHash(i);
-      announce(`${PAINTINGS[i].title}, ${PAINTINGS[i].artist}, ${PAINTINGS[i].date}`);
+      announce(describe(i));
     });
   }
 
@@ -377,7 +537,7 @@ function run(textures, depthPixels, loadFull) {
         return;
       }
       const ov = LIGHT[S.lights].overview;
-      immersive.set(PAINTINGS[j], tex[0], tex[1], depthPixels[j]);
+      immersive.set(PAINTINGS[j], tex, tex.pixels);
       S.current = j;
       S.focusIndex = j;
       S.T = S.C = j;
@@ -387,7 +547,7 @@ function run(textures, depthPixels, loadFull) {
       setChapter(0);
       S.invert = 1;
       setHash(j, true);
-      announce(`${PAINTINGS[j].title}, ${PAINTINGS[j].artist}, ${PAINTINGS[j].date}`);
+      announce(describe(j));
       tween(1.1, (k) => { S.thresh = lerp(1.08, -0.15, k); }, () => {
         S.mode = "view";
         ui.view.classList.remove("swapping");
@@ -419,21 +579,40 @@ function run(textures, depthPixels, loadFull) {
   addEventListener("popstate", () => {
     const i = hashIndex();
     if (i >= 0) {
-      if (S.mode === "gallery") { S.C = S.T = i; enter(i); }
+      if (S.mode === "gallery") { S.C = S.T = i; openPainting(i); }
       else if (S.mode === "view") switchTo(i);
     } else if (S.mode === "view") leave();
   });
   document.querySelector("[data-home]").addEventListener("click", (e) => {
     e.preventDefault();
     if (S.mode === "view") leave(() => { S.T = -1; });
-    else if (S.mode === "gallery") { S.T = -1; S.lastInput = performance.now(); }
+    else if (S.mode === "gallery" && S.opening === "done") { S.T = -1; S.lastInput = performance.now(); }
   });
 
   // ------------------------------------------------ controls
+  // Labels double as aria-labels: on phones only the icons are shown.
+  function labelToggles() {
+    const u = L();
+    const lt = S.lights === "on" ? u.lightsOn : u.lamp;
+    const st = sound.on ? u.soundOn : u.soundOff;
+    ui.lights.querySelector(".toggle-label").textContent = lt;
+    ui.lights.setAttribute("aria-label", lt);
+    ui.sound.querySelector(".toggle-label").textContent = st;
+    ui.sound.setAttribute("aria-label", st);
+  }
+
+  function setSound(on) {
+    sound.enable(on);
+    ui.sound.setAttribute("aria-pressed", String(sound.on));
+    labelToggles();
+  }
+  ui.sound.addEventListener("click", () => setSound(!sound.on));
+
   const toggleLights = () => {
     S.lights = S.lights === "lamp" ? "on" : "lamp";
     ui.lights.setAttribute("aria-pressed", String(S.lights === "on"));
-    ui.lights.querySelector(".lights-label").textContent = S.lights === "on" ? "Lights on" : "Lamp";
+    labelToggles();
+    sound.click(0, 0.7);
   };
   ui.lights.addEventListener("click", toggleLights);
   $("#view-back").addEventListener("click", () => leave());
@@ -459,6 +638,8 @@ function run(textures, depthPixels, loadFull) {
       // Let the wall scroll natively once we are on it.
       if (e.target instanceof Node && ui.wall.contains(e.target) && S.C > N - 0.1 && (ui.wall.scrollTop > 0 || d > 0)) return;
       e.preventDefault();
+      if (S.opening === "waiting") { if (d > 4) startOpening(false); return; }
+      if (S.opening === "playing") return;
       S.T = clamp(S.T + d * 0.0022, -1, N);
       S.lastInput = performance.now();
     } else {
@@ -481,6 +662,12 @@ function run(textures, depthPixels, loadFull) {
     if (k === "l" || k === "L") return toggleLights();
     const onButton = e.target.closest && e.target.closest("button, a");
     if (S.mode === "gallery") {
+      if (S.opening === "waiting") {
+        if (["Enter", " "].includes(k) && !onButton) { e.preventDefault(); startOpening(true); }
+        else if (["ArrowRight", "ArrowDown", "PageDown"].includes(k)) { e.preventDefault(); startOpening(false); }
+        return;
+      }
+      if (S.opening === "playing") return;
       let d = 0;
       if (["ArrowRight", "ArrowDown", "PageDown"].includes(k) || (k === " " && !onButton)) d = 1;
       if (["ArrowLeft", "ArrowUp", "PageUp"].includes(k)) d = -1;
@@ -505,30 +692,10 @@ function run(textures, depthPixels, loadFull) {
 
   // Pointer: lamp + parallax everywhere; drag to travel the gallery; in the
   // view, press-and-hold for the loupe and swipe for chapters / paintings.
-  const drag = { on: false, id: null, x0: 0, y0: 0, T0: 0, moved: false, axis: null, timer: 0, t0: 0 };
+  const drag = { on: false, id: null, x0: 0, y0: 0, T0: 0, moved: false, axis: null, timer: 0 };
   const uiTarget = (t) => t.closest && t.closest("button, a, .wall, .scrub-track");
 
-  addEventListener("pointermove", (e) => {
-    s_pointer(e.clientX, e.clientY);
-    if (e.pointerType === "mouse") ui.cursor.classList.add("on");
-    if (!drag.on || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-    if (!drag.moved && Math.hypot(dx, dy) > 8) {
-      drag.moved = true;
-      drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      if (S.loupeTarget === 0) clearTimeout(drag.timer);
-    }
-    if (S.mode === "gallery" && drag.moved) {
-      const r = gallery.cardRect(clamp(Math.round(S.C), 0, N - 1));
-      const per = Math.max(120, (r.x1 - r.x0) * 1.1);
-      const d = drag.axis === "x" ? dx : dy * (e.pointerType === "mouse" ? 0 : 1);
-      S.T = clamp(drag.T0 - d / per, -1, N);
-      S.lastInput = performance.now();
-    }
-    if (S.loupeTarget > 0) S.loupe = [e.clientX / innerWidth, e.clientY / innerHeight];
-  });
-
-  function s_pointer(x, y) {
+  function pointerAt(x, y) {
     S.tlx = x / innerWidth;
     S.tly = y / innerHeight;
     S.tx = (x / innerWidth - 0.5) * 2;
@@ -538,10 +705,32 @@ function run(textures, depthPixels, loadFull) {
     S.lastMove = performance.now();
   }
 
+  addEventListener("pointermove", (e) => {
+    pointerAt(e.clientX, e.clientY);
+    if (e.pointerType === "mouse") ui.cursor.classList.add("on");
+    if (!drag.on || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.hypot(dx, dy) > 8) {
+      drag.moved = true;
+      drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (S.loupeTarget === 0) clearTimeout(drag.timer);
+    }
+    if (S.mode === "gallery" && drag.moved) {
+      if (S.opening === "waiting") { startOpening(false); drag.on = false; return; }
+      if (S.opening !== "done") return;
+      const r = gallery.cardRect(clamp(Math.round(S.C), 0, N - 1));
+      const per = Math.max(120, (r.x1 - r.x0) * 1.1);
+      const d = drag.axis === "x" ? dx : dy * (e.pointerType === "mouse" ? 0 : 1);
+      S.T = clamp(drag.T0 - d / per, -1, N);
+      S.lastInput = performance.now();
+    }
+    if (S.loupeTarget > 0) S.loupe = [e.clientX / innerWidth, e.clientY / innerHeight];
+  });
+
   addEventListener("pointerdown", (e) => {
     if (e.button > 0 || uiTarget(e.target)) return;
-    s_pointer(e.clientX, e.clientY);
-    Object.assign(drag, { on: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, T0: S.T, moved: false, axis: null, t0: performance.now() });
+    pointerAt(e.clientX, e.clientY);
+    Object.assign(drag, { on: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, T0: S.T, moved: false, axis: null });
     if (S.mode === "view") {
       drag.timer = setTimeout(() => {
         if (drag.on && (!drag.moved || e.pointerType === "mouse")) {
@@ -565,6 +754,8 @@ function run(textures, depthPixels, loadFull) {
     }
     if (S.mode === "gallery") {
       if (!drag.moved && e.type === "pointerup") {
+        if (S.opening === "waiting") return startOpening(true);
+        if (S.opening !== "done") return;
         // Click: open the centered card, or travel to the one clicked.
         const hit = hitCard(e.clientX, e.clientY);
         if (hit >= 0) {
@@ -584,7 +775,7 @@ function run(textures, depthPixels, loadFull) {
   function hitCard(x, y) {
     let best = -1, bestActive = -1;
     gallery.cards.forEach((c, i) => {
-      if (c.vis < 0.3) return;
+      if (c.vis < 0.3 || !c.mesh.visible) return;
       const r = gallery.cardRect(i);
       if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && c.active > bestActive) {
         best = i;
@@ -602,6 +793,7 @@ function run(textures, depthPixels, loadFull) {
     S.lastInput = performance.now();
   };
   ui.scrubTrack.addEventListener("pointerdown", (e) => {
+    if (S.opening !== "done") return;
     scrubbing = true;
     ui.scrubTrack.setPointerCapture(e.pointerId);
     scrubTo(e.clientX);
@@ -627,16 +819,33 @@ function run(textures, depthPixels, loadFull) {
     }
   }
 
-  // ------------------------------------------------ layout
+  // ------------------------------------------------ layout & quality
   function resize() {
     const w = innerWidth, h = innerHeight;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, finePointer ? 1.75 : 1.5));
+    renderer.setPixelRatio(TIERS[S.tier].dpr);
     renderer.setSize(w, h, false);
     gallery.resize(w, h);
     immersive.resize(w, h);
   }
   addEventListener("resize", resize);
   resize();
+
+  // Step quality down when frames run long, and back up when there is headroom.
+  function adaptQuality(dtMs, now) {
+    if (document.hidden || dtMs > 100) return;
+    S.frameMs = S.frameMs * 0.95 + dtMs * 0.05;
+    const since = now - S.tierAt;
+    let tier = S.tier;
+    if (S.frameMs > 26 && since > 2000 && tier < TIERS.length - 1) tier++;
+    else if (S.frameMs < 13 && since > 8000 && tier > 0) tier--;
+    if (tier === S.tier) return;
+    S.tier = tier;
+    S.tierAt = now;
+    S.frameMs = 16.7;
+    renderer.setPixelRatio(TIERS[tier].dpr);
+    renderer.setSize(innerWidth, innerHeight, false);
+    immersive.setSteps(TIERS[tier].steps);
+  }
 
   const tintAt = (C) => {
     const c = clamp(C, 0, N - 1);
@@ -648,10 +857,12 @@ function run(textures, depthPixels, loadFull) {
   // ------------------------------------------------ loop
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dtMs = now - last;
+    const dt = Math.min(0.05, dtMs / 1000);
     last = now;
     const t = now / 1000;
     runTweens(now);
+    adaptQuality(dtMs, now);
 
     // Parallax target: pointer, device tilt, or a slow idle drift.
     const idle = clamp01((now - S.lastMove - 2500) / 1500);
@@ -677,30 +888,52 @@ function run(textures, depthPixels, loadFull) {
     S.ccy = damp(S.ccy, S.cy, 18, dt);
     ui.cursor.style.transform = `translate(${S.ccx.toFixed(1)}px, ${S.ccy.toFixed(1)}px)`;
 
+    // Opening: spotlights switch on one by one, each with a clack.
+    if (S.opening === "playing") {
+      const st = (now - S.openingT0) / 1000;
+      for (let i = 0; i < N; i++) {
+        S.power[i] = powerAt(i, st);
+        const x = st - lightDelay(i);
+        if (x >= 0 && S.clicked[i] === 0) {
+          S.clicked[i] = 1;
+          const [sx] = gallery.toScreen(gallery.cardPoint(i, 0, 0));
+          sound.click((sx / innerWidth) * 2 - 1, 1);
+        } else if (!reduceMotion && x >= 0.11 && S.clicked[i] === 1) {
+          S.clicked[i] = 2;
+          const [sx] = gallery.toScreen(gallery.cardPoint(i, 0, 0));
+          sound.click((sx / innerWidth) * 2 - 1, 0.45);
+        }
+      }
+    }
+
     // Gallery travel, with a gentle snap to the nearest stop once input stops.
-    if (S.mode === "gallery" && !drag.on && !scrubbing && now - S.lastInput > 160) S.T = snapValue(S.T);
+    if (S.mode === "gallery" && S.opening === "done" && !drag.on && !scrubbing && now - S.lastInput > 160) S.T = snapValue(S.T);
     const prevC = S.C;
     S.C = damp(S.C, S.T, 5.5, dt);
     if (Math.abs(S.C - S.T) < 1e-4) S.C = S.T;
     S.vel = damp(S.vel, (S.C - prevC) / Math.max(dt, 1e-3), 8, dt);
+    if (S.opening === "playing") S.vel = 0;
     if (S.pendingOpen >= 0 && Math.abs(S.C - S.pendingOpen) < 0.03) enter(S.pendingOpen);
 
-    const L = LIGHT[S.lights];
-    const introK = smoothstep(-1, -0.2, S.C);
+    const Lt = LIGHT[S.lights];
+    const introK = S.opening === "done" ? smoothstep(-1, -0.2, S.C) : 1;
     const wallK = smoothstep(N - 1 + 0.25, N - 0.15, S.C);
     const fe = S.focusT * S.focusT * (3 - 2 * S.focusT);
+
+    // Hover lean on the card under a mouse.
+    S.hover = finePointer && S.mode === "gallery" && S.opening === "done" && !drag.on && wallK < 0.5 ? hitCard(S.cx, S.cy) : -1;
 
     renderer.clear();
     if (S.viewOpacity < 0.999) {
       gallery.update({
-        C: S.C, vel: S.vel, time: t,
+        C: S.C, vel: S.vel, time: t, now,
         mouse: [S.px, S.py], light: [S.lx, S.ly],
-        ambient: lerp(0.03, L.gallery[0], introK),
-        lamp: lerp(1.2, L.gallery[1], introK),
-        tint: tintAt(S.C),
+        ambient: lerp(0.03, Lt.gallery[0], introK),
+        lamp: S.opening === "waiting" ? 1.2 : lerp(1.2, Lt.gallery[1], introK),
+        tint: tintAt(S.C), power: S.power, hover: S.hover, pull: S.pull,
         focusIndex: S.focusIndex, focusT: S.focusT,
         focusFit: S.focusIndex >= 0 ? fitHeight(innerWidth / innerHeight, PAINTINGS[S.focusIndex].aspect) : 1,
-        focusAmbient: L.overview[0], focusLamp: L.overview[1],
+        focusAmbient: Lt.overview[0], focusLamp: Lt.overview[1],
         cardsVis: 1 - wallK, floorVis: 1 - wallK * 0.75,
       });
       gallery.render();
@@ -734,14 +967,16 @@ function run(textures, depthPixels, loadFull) {
 
     // ---------------- DOM overlays
     const inGallery = S.mode === "gallery" || S.mode === "entering" || S.mode === "leaving";
-    ui.intro.style.opacity = (1 - smoothstep(-0.85, -0.4, S.C)) * (1 - fe);
+    const introO = S.opening === "done" ? 1 - smoothstep(-0.85, -0.4, S.C) : S.introO;
+    ui.intro.style.opacity = (introO * (1 - fe)).toFixed(3);
 
-    const capsK = introK * (1 - wallK) * (1 - fe) * (inGallery ? 1 : 0);
+    const capsK = (S.opening === "done" ? introK : smoothstep(1.35, 1.05, S.pull)) * (1 - wallK) * (1 - fe) * (inGallery ? 1 : 0);
     gallery.cards.forEach((c, i) => {
       const e = cardEls[i];
       const show = c.mesh.visible && capsK > 0.01 && c.vis > 0.02;
       if (!show) {
         e.cap.style.opacity = e.btn.style.opacity = e.year.style.opacity = "0";
+        e.btn.style.pointerEvents = "none";
         e.btn.tabIndex = -1;
         return;
       }
@@ -753,7 +988,7 @@ function run(textures, depthPixels, loadFull) {
       const capP = gallery.toScreen(gallery.cardPoint(i, -c.w / 2 + pad, -CARD_H / 2 + pad));
       const btnP = gallery.toScreen(gallery.cardPoint(i, c.w / 2 - pad, -CARD_H / 2 + pad));
       const yearP = gallery.toScreen(gallery.cardPoint(i, 0, -CARD_H / 2 - 0.3));
-      const o = c.vis * capsK;
+      const o = c.vis * capsK * S.power[i];
       e.cap.style.maxWidth = `${((c.w / CARD_H) * hpx * 0.72) / sc}px`;
       e.cap.style.whiteSpace = "normal";
       e.cap.style.transform = `translate(${capP[0].toFixed(1)}px, ${capP[1].toFixed(1)}px) translateY(-100%) scale(${sc.toFixed(3)})`;
@@ -767,13 +1002,12 @@ function run(textures, depthPixels, loadFull) {
       e.year.classList.toggle("on", c.active > 0.5);
     });
 
-    const scrubK = introK * (1 - wallK) * (1 - fe) * (inGallery ? 1 : 0);
+    const scrubK = (S.opening === "done" ? introK : 0) * (1 - wallK) * (1 - fe) * (inGallery ? 1 : 0);
     ui.scrub.style.opacity = scrubK.toFixed(3);
     ui.scrub.style.visibility = scrubK > 0.01 ? "visible" : "hidden";
     const ci = clamp(Math.round(S.C), 0, N - 1);
     ui.scrubDot.style.left = `${((clamp(S.C, 0, N - 1) + 0.5) / N) * 100}%`;
     scrubBtns.forEach((b, i) => b.classList.toggle("on", i === ci));
-    const cp = PAINTINGS[ci];
 
     const wallO = wallK * (inGallery ? 1 : 0);
     ui.wall.style.opacity = wallO.toFixed(3);
@@ -782,9 +1016,9 @@ function run(textures, depthPixels, loadFull) {
 
     // Announce the painting in front of you.
     const nearest = S.C < -0.5 ? -1 : S.C > N - 0.5 ? N : ci;
-    if (inGallery && nearest !== S.announced && Math.abs(S.C - S.T) < 0.05) {
+    if (inGallery && S.opening === "done" && nearest !== S.announced && Math.abs(S.C - S.T) < 0.05) {
       S.announced = nearest;
-      if (nearest >= 0 && nearest < N) announce(`${cp.date}: ${cp.title}, ${cp.artist}`);
+      if (nearest >= 0 && nearest < N) announce(describe(nearest));
     }
 
     // Hotspot markers ride on the 3D surface.
@@ -803,9 +1037,8 @@ function run(textures, depthPixels, loadFull) {
     // Cursor label over the centered card.
     if (finePointer) {
       let label = "";
-      if (S.mode === "gallery" && introK > 0.5 && wallK < 0.5 && !(drag.on && drag.moved)) {
-        const hit = hitCard(S.cx, S.cy);
-        if (hit >= 0 && !document.elementFromPoint(S.cx, S.cy)?.closest("button, a")) label = Math.abs(S.C - hit) < 0.3 ? "View" : "Go";
+      if (S.hover >= 0 && introK > 0.5 && !document.elementFromPoint(S.cx, S.cy)?.closest("button, a")) {
+        label = Math.abs(S.C - S.hover) < 0.3 ? L().cursorView : L().cursorGo;
       }
       if (ui.cursorLabel.textContent !== label) ui.cursorLabel.textContent = label;
       ui.cursor.classList.toggle("label", !!label);
@@ -818,8 +1051,8 @@ function run(textures, depthPixels, loadFull) {
   // ------------------------------------------------ go
   document.body.classList.remove("is-loading");
   ui.loader.classList.add("done");
-  const deep = hashIndex();
   if (deep >= 0) {
+    ui.intro.classList.add("entered");
     S.T = S.C = deep;
     enter(deep);
   }

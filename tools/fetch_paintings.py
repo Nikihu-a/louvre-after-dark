@@ -1,13 +1,15 @@
 """Download the paintings from Wikimedia Commons and build every web asset.
 
 Usage:
-    python tools/fetch_paintings.py <depth-model.onnx> [painting-id ...]
+    python tools/fetch_paintings.py <depth-model.onnx> <lama.onnx> [painting-id ...]
 
 For each painting this writes into assets/paintings/:
-    <id>.jpg            2400px long side, used in the immersive view
-    <id>-card.jpg       1280px long side, used on the gallery cards
-    <id>-depth.png      full-size depth map (tools/make_depth.py)
-    <id>-depth-sm.png   512px depth map for the gallery cards
+    <id>.webp            2400px long side, used in the immersive view
+    <id>-card.webp       1280px long side, used on the gallery cards
+    <id>-depth.webp      full-size depth map (tools/make_depth.py, lossless)
+    <id>-depth-sm.webp   512px depth map for the gallery cards
+    <id>-plate.webp      background plate behind figure edges (tools/make_plate.py)
+    <id>-bgdepth.webp    depth of that plate
 
 All source images are photographs of public-domain paintings in the Musée du Louvre.
 """
@@ -21,6 +23,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(__file__))
 import make_depth  # noqa: E402
+import make_plate  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "assets", "paintings")
@@ -86,7 +89,7 @@ def resized(img, long_side):
     return img.resize((round(w * s), round(h * s)), Image.LANCZOS) if s < 1 else img.copy()
 
 
-def build(pid, model):
+def build(pid, model, lama):
     src = os.path.join(OUT, f"{pid}.src.jpg")
     if not os.path.exists(src):
         curl(thumb_url(COMMONS[pid], 3000), src)
@@ -96,24 +99,25 @@ def build(pid, model):
     if pid in ARCHED:
         img, mask = mask_corners(img)
 
-    full = os.path.join(OUT, f"{pid}.jpg")
-    resized(img, 2400).save(full, quality=84, optimize=True, progressive=True)
-    resized(img, 1280).save(os.path.join(OUT, f"{pid}-card.jpg"), quality=80, optimize=True, progressive=True)
+    full = os.path.join(OUT, f"{pid}.webp")
+    resized(img, 2400).save(full, quality=82, method=6)
+    resized(img, 1280).save(os.path.join(OUT, f"{pid}-card.webp"), quality=76, method=6)
 
-    depth = os.path.join(OUT, f"{pid}-depth.png")
+    depth = os.path.join(OUT, f"{pid}-depth.webp")
     make_depth.run(model, full, depth, 1288, 7)
     if mask is not None:
         d = Image.open(depth)
         d.paste(0, mask=mask.resize(d.size))
-        d.save(depth, optimize=True)
-    resized(Image.open(depth), 512).save(os.path.join(OUT, f"{pid}-depth-sm.png"), optimize=True)
+        d.save(depth, lossless=True)
+    resized(Image.open(depth), 512).save(os.path.join(OUT, f"{pid}-depth-sm.webp"), lossless=True)
+    make_plate.run(lama, full, depth, os.path.join(OUT, f"{pid}-plate.webp"), os.path.join(OUT, f"{pid}-bgdepth.webp"))
     os.remove(src)
     print(f"ok {pid} {Image.open(full).size}")
 
 
 if __name__ == "__main__":
-    model = sys.argv[1]
-    ids = sys.argv[2:] or list(COMMONS)
+    model, lama = sys.argv[1], sys.argv[2]
+    ids = sys.argv[3:] or list(COMMONS)
     os.makedirs(OUT, exist_ok=True)
     for pid in ids:
-        build(pid, model)
+        build(pid, model, lama)

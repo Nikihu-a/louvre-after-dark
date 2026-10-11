@@ -10,12 +10,15 @@
   <meta property="og:title" content="Louvre After Dark — by Niki">
   <meta property="og:description" content="Ten Louvre masterpieces from 1483 to 1830, seen in 3D depth by lamplight.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="https://nikihu-a.github.io/louvre-after-dark/assets/paintings/horatii-card.jpg">
+  <meta property="og:url" content="https://nikihu-a.github.io/louvre-after-dark/">
+  <meta property="og:image" content="https://nikihu-a.github.io/louvre-after-dark/assets/og-cover.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307060a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%23d9b26f' stroke-width='1.6'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23ffe2aa'/%3E%3C/svg%3E">
   <link rel="preload" href="assets/fonts/cormorant-garamond-latin-300-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/cormorant-garamond-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body class="is-loading">
   <canvas id="gl" aria-hidden="true"></canvas>
@@ -25,25 +28,29 @@
   <div class="loader" id="loader" role="status" aria-live="polite">
     <div class="loader-lamp" aria-hidden="true"></div>
     <p class="loader-title"><em>Louvre</em> After Dark</p>
-    <p class="loader-text">Lighting the gallery <span id="loader-pct">0%</span></p>
+    <p class="loader-text"><span data-i18n="loading">Lighting the gallery</span> <span id="loader-pct">0%</span></p>
     <div class="loader-line" aria-hidden="true"><i id="loader-bar"></i></div>
   </div>
 
   <header class="topbar">
     <a class="logo" href="#/" data-home>LOUVRE<i>·</i>NUIT</a>
     <div class="topbar-right">
-      <button class="lights" id="lights" type="button" aria-pressed="false" title="Toggle lights (L)">
-        <span class="lights-dot" aria-hidden="true"></span><span class="lights-label">Lamp</span>
+      <button class="toggle" id="sound" type="button" aria-pressed="false">
+        <span class="toggle-dot" aria-hidden="true"></span><svg class="toggle-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor"/><path class="wave" d="M13 7.5a3.5 3.5 0 0 1 0 5M15 5.5a6.5 6.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="toggle-label" data-i18n="soundOff">Sound off</span>
       </button>
-      <span class="tag">Louvre After Dark <em>by Niki</em></span>
+      <button class="toggle" id="lights" type="button" aria-pressed="false" title="Toggle lights (L)">
+        <span class="toggle-dot" aria-hidden="true"></span><svg class="toggle-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5a4.5 4.5 0 0 0-2.6 8.2c.4.3.6.7.6 1.2V14h4v-1.1c0-.5.2-.9.6-1.2A4.5 4.5 0 0 0 10 3.5z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8.2 16.2h3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="toggle-label" data-i18n="lamp">Lamp</span>
+      </button>
+      <button class="lang" id="lang" type="button" aria-label="切换到中文">中</button>
+      <span class="tag"><span data-i18n="tag">Louvre After Dark</span> <em>by Niki</em></span>
     </div>
   </header>
 
   <!-- Intro (gallery scroll position before the first painting) -->
   <section class="intro" id="intro">
-    <p class="kicker">Musée du Louvre · Après la fermeture</p>
-    <h1><em>Night falls.</em> The Louvre is closed.</h1>
-    <p class="hint">Move to carry the lamp <span>· Scroll to enter</span></p>
+    <p class="kicker" data-i18n="kicker">Musée du Louvre · Après la fermeture</p>
+    <h1><em data-i18n="introLead">Night falls.</em> <span data-i18n="introRest">The Louvre is closed.</span></h1>
+    <p class="hint"><span data-i18n="introHintSound">Click to enter with sound</span> <i>·</i> <span class="quiet" data-i18n="introHintQuiet">Scroll to enter in silence</span></p>
   </section>
 
   <!-- Gallery card captions, positioned over the 3D cards -->
@@ -59,14 +66,14 @@
 
   <!-- Immersive view -->
   <section class="view" id="view" aria-hidden="true">
-    <button class="view-back" id="view-back" type="button"><span aria-hidden="true">←</span> Gallery <kbd>Esc</kbd></button>
+    <button class="view-back" id="view-back" type="button"><span aria-hidden="true">←</span> <span data-i18n="back">Gallery</span> <kbd>Esc</kbd></button>
 
     <div class="view-panel view-title" data-chapter="0">
       <p class="eyebrow" id="v-eyebrow"></p>
       <h2 id="v-original"></h2>
       <p class="sub"><span id="v-title"></span> <b id="v-artist"></b></p>
       <p class="lead" id="v-lead"></p>
-      <button class="pill" type="button" data-step="1">Explore details <span aria-hidden="true">→</span></button>
+      <button class="pill" type="button" data-step="1"><b data-i18n="explore">Explore details</b> <span aria-hidden="true">→</span></button>
     </div>
 
     <div class="view-panel view-detail" data-chapter="detail">
@@ -78,7 +85,7 @@
     <div class="view-panel view-next" data-chapter="4">
       <p class="eyebrow" id="n-eyebrow"></p>
       <h2 id="n-title"></h2>
-      <button class="pill" type="button" id="n-go">Continue <span aria-hidden="true">→</span></button>
+      <button class="pill" type="button" id="n-go"><b id="n-go-label">Continue</b> <span aria-hidden="true">→</span></button>
     </div>
 
     <div class="hotspots" id="hotspots"></div>
@@ -87,30 +94,31 @@
 
     <div class="view-foot">
       <p class="view-meta" id="v-meta"></p>
-      <p class="view-hint"><span class="fine">Hold to magnify · <kbd>↑</kbd><kbd>↓</kbd> details · <kbd>←</kbd><kbd>→</kbd> paintings · <kbd>L</kbd> lights</span><span class="coarse">Press and hold to magnify · Swipe ↑↓ details, ←→ paintings</span></p>
+      <p class="view-hint"><span class="fine" data-i18n="hintFine"></span><span class="coarse" data-i18n="hintCoarse"></span></p>
     </div>
   </section>
 
   <!-- End of the timeline -->
   <section class="wall" id="wall" aria-label="The collection">
     <div class="wall-inner">
-      <p class="eyebrow">1483 — 1830</p>
-      <h2><em>The collection.</em> Ten paintings, one night.</h2>
+      <p class="eyebrow" data-i18n="wallEyebrow">1483 — 1830</p>
+      <h2><em data-i18n="wallLead">The collection.</em> <span data-i18n="wallRest">Ten paintings, one night.</span></h2>
       <ol class="wall-grid" id="wall-grid"></ol>
       <footer class="wall-foot">
-        <p class="sig">Curated, designed &amp; built by <em>Niki</em></p>
-        <p class="links"><a href="https://github.com/Nikihu-a/louvre-after-dark" target="_blank" rel="noopener">Source on GitHub ↗</a></p>
-        <p class="credits">All ten paintings belong to the Musée du Louvre and are in the public domain. Photographs via Wikimedia Commons. Depth maps generated with Depth Anything V2. Typeface Cormorant Garamond (SIL OFL). 3D with three.js (MIT). An independent project, not affiliated with the Musée du Louvre.</p>
+        <p class="sig"><span data-i18n="sig">Curated, designed &amp; built by</span> <em>Niki</em></p>
+        <p class="links"><a href="https://github.com/Nikihu-a/louvre-after-dark" target="_blank" rel="noopener" data-i18n="source">Source on GitHub ↗</a></p>
+        <p class="credits" data-i18n="credits"></p>
         <p class="copy">© 2026 Niki</p>
       </footer>
     </div>
   </section>
 
+  <div class="lost" id="lost" role="status"><span data-i18n="lost">Relighting the gallery…</span></div>
   <div class="cursor" id="cursor" aria-hidden="true"><span id="cursor-label"></span></div>
   <p class="sr-only" id="announce" aria-live="polite"></p>
 
   <noscript><p class="noscript">This experience needs JavaScript and WebGL.</p></noscript>
 
-  <script type="module" src="js/app.js?v=4"></script>
+  <script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>

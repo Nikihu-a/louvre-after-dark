@@ -32,18 +32,24 @@ Curated, designed and built by **Niki**.
 | Step through details | Scroll, ↑ ↓, or click the gold markers | Swipe up / down, tap markers |
 | Next / previous painting | ← → | Swipe left / right |
 | Magnifier | Press and hold | Press and hold |
-| Lamp or full lights | `L` or the toggle in the top bar | The toggle in the top bar |
+| Lamp or full lights | `L` or the toggle in the top bar | The bulb icon |
+| Sound | The toggle in the top bar (or click to enter) | The speaker icon |
+| English / 中文 | The 中 / EN button | The 中 / EN button |
 | Back to the gallery | `Esc` or "Gallery" | "Gallery" |
 
-Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/louvre-after-dark/#/horatii).
+Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/louvre-after-dark/#/horatii). A lightweight version without 3D is at [`?static`](https://nikihu-a.github.io/louvre-after-dark/?static) (devices without WebGL 2 get it automatically).
 
 ## How it works
 
 - **No build step.** Plain HTML, CSS and ES modules; [three.js](https://threejs.org) r169 is vendored in `vendor/`, and fonts are self-hosted, so the site loads without any third-party CDN.
-- **Depth maps.** Each painting has a depth map estimated offline with [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) (`tools/make_depth.py`). Near edges are dilated slightly so that, when the camera moves, the gap behind a figure stretches background texture rather than smearing the figure.
-- **Gallery** (`js/gallery.js`). Cards are bent onto a cylinder in the vertex shader; the radius tightens with scroll speed. A one-tap depth offset makes the centered card breathe with the cursor.
+- **Depth maps.** Each painting has a depth map estimated offline with [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) (`tools/make_depth.py`). Near edges are dilated slightly so the figures keep clean silhouettes.
+- **Background plates.** When the camera moves, a gap opens behind every figure. `tools/make_plate.py` finds the near side of every depth edge and has [LaMa](https://github.com/advimman/lama) inpaint what lies behind it; the shader re-traces those gaps against this plate instead of stretching the figure's edge.
+- **Opening.** The camera starts far back, looking at the middle of the arc, and dollies in while the spotlights switch on one by one from 1483 to 1830. The clack of each switch is synthesized with the Web Audio API — there are no audio files.
+- **Gallery** (`js/gallery.js`). Cards are bent onto a cylinder in the vertex shader; the radius tightens and colors split slightly with scroll speed. Each card is mirrored, blurred, into the polished floor. A one-tap depth offset makes the centered card breathe with the cursor.
 - **Immersive view** (`js/immersive.js`). A full-screen parallax-occlusion ray march through the depth map, so near figures properly occlude far ones as the camera pans, dollies in or the lamp moves. The same shader draws the loupe and the depth-ordered dissolve between paintings.
 - **Hand-off.** When you open a painting, its card flies to exactly the size and position of the immersive view's first frame, so the switch between the two renderers is invisible.
+- **Performance.** Images are WebP; only the first four cards gate the loader and the rest stream in behind it. If frames run long, the renderer steps its resolution and ray-march quality down, and back up when there is headroom. A lost WebGL context (e.g. after sleep) is restored automatically.
+- **Languages.** English and Chinese; texts live in `js/data.js` and `js/i18n.js`, and the choice is remembered.
 
 ## Run locally
 
@@ -62,16 +68,19 @@ The processed images and depth maps are committed, so this is only needed to add
 ```bash
 python3 -m venv .venv && .venv/bin/pip install onnxruntime numpy pillow
 curl -L -o depth-small.onnx https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx
-.venv/bin/python tools/fetch_paintings.py depth-small.onnx            # all paintings
-.venv/bin/python tools/fetch_paintings.py depth-small.onnx horatii    # just one
+curl -L -o lama.onnx https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx
+.venv/bin/python tools/fetch_paintings.py depth-small.onnx lama.onnx            # all paintings
+.venv/bin/python tools/fetch_paintings.py depth-small.onnx lama.onnx horatii    # just one
+.venv/bin/python tools/make_og.py                                               # share image
 ```
 
-Painting texts and hotspot positions live in `js/data.js`.
+Painting texts and hotspot positions live in `js/data.js` (English) and `js/i18n.js` (Chinese). After changing CSS or JS, bump the `?v=` numbers in `index.html` so returning visitors don't get a cached copy.
 
 ## Credits
 
 - All ten paintings are in the collection of the **Musée du Louvre** and are in the public domain. Photographs via [Wikimedia Commons](https://commons.wikimedia.org).
 - Depth estimation: Depth Anything V2 (small), via the ONNX export by onnx-community.
+- Background inpainting: LaMa, via the ONNX export by Carve.
 - Typeface: [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant), SIL Open Font License (`assets/fonts/OFL.txt`).
 - 3D: [three.js](https://threejs.org), MIT License (`vendor/three.LICENSE`).
 
