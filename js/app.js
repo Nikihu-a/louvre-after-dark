@@ -383,9 +383,9 @@ function run(loadCard, loadFull, order, deep) {
   };
 
   // ------------------------------------------------ opening
-  function startOpening(withSound) {
+  // Entering never turns sound on by itself; only the sound button does.
+  function startOpening() {
     if (S.opening !== "waiting") return;
-    if (withSound) setSound(true);
     S.opening = "playing";
     S.openingT0 = performance.now();
     sound.swell(OPENING * 0.9);
@@ -562,11 +562,11 @@ function run(loadCard, loadFull, order, deep) {
   function labelToggles() {
     const u = L();
     const lt = S.lights === "on" ? u.lightsOn : u.lamp;
-    const st = sound.on ? u.soundOn : u.soundOff;
+    const st = sound.on ? u.soundOff : u.soundOn;
     ui.lights.querySelector(".toggle-label").textContent = lt;
     ui.lights.setAttribute("aria-label", lt);
     ui.sound.querySelector(".toggle-label").textContent = st;
-    ui.sound.setAttribute("aria-label", st);
+    ui.sound.setAttribute("aria-label", sound.on ? u.soundOffLabel : u.soundOnLabel);
   }
 
   function setSound(on) {
@@ -606,7 +606,7 @@ function run(loadCard, loadFull, order, deep) {
       // Let the wall scroll natively once we are on it.
       if (e.target instanceof Node && ui.wall.contains(e.target) && S.C > N - 0.1 && (ui.wall.scrollTop > 0 || d > 0)) return;
       e.preventDefault();
-      if (S.opening === "waiting") { if (d > 4) startOpening(false); return; }
+      if (S.opening === "waiting") { if (d > 4) startOpening(); return; }
       if (S.opening === "playing") return;
       S.T = clamp(S.T + d * 0.0022, -1, N);
       S.lastInput = performance.now();
@@ -631,8 +631,8 @@ function run(loadCard, loadFull, order, deep) {
     const onButton = e.target.closest && e.target.closest("button, a");
     if (S.mode === "gallery") {
       if (S.opening === "waiting") {
-        if (["Enter", " "].includes(k) && !onButton) { e.preventDefault(); startOpening(true); }
-        else if (["ArrowRight", "ArrowDown", "PageDown"].includes(k)) { e.preventDefault(); startOpening(false); }
+        if (["Enter", " "].includes(k) && !onButton) { e.preventDefault(); startOpening(); }
+        else if (["ArrowRight", "ArrowDown", "PageDown"].includes(k)) { e.preventDefault(); startOpening(); }
         return;
       }
       if (S.opening === "playing") return;
@@ -684,7 +684,7 @@ function run(loadCard, loadFull, order, deep) {
       if (S.loupeTarget === 0) clearTimeout(drag.timer);
     }
     if (S.mode === "gallery" && drag.moved) {
-      if (S.opening === "waiting") { startOpening(false); drag.on = false; return; }
+      if (S.opening === "waiting") { startOpening(); drag.on = false; return; }
       if (S.opening !== "done") return;
       const r = gallery.cardRect(clamp(Math.round(S.C), 0, N - 1));
       const per = Math.max(120, (r.x1 - r.x0) * 1.1);
@@ -722,7 +722,7 @@ function run(loadCard, loadFull, order, deep) {
     }
     if (S.mode === "gallery") {
       if (!drag.moved && e.type === "pointerup") {
-        if (S.opening === "waiting") return startOpening(true);
+        if (S.opening === "waiting") return startOpening();
         if (S.opening !== "done") return;
         // Click: open the centered card, or travel to the one clicked.
         const hit = hitCard(e.clientX, e.clientY);

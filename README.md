@@ -31,7 +31,7 @@ Curated, designed and built by **Niki**.
 | Next / previous painting | ← → | Swipe left / right |
 | Magnifier | Press and hold | Press and hold |
 | Lamp or full lights | `L` or the toggle in the top bar | The bulb icon |
-| Sound | The toggle in the top bar (or click to enter) | The speaker icon |
+| Sound (off by default) | "Sound on" / "Sound off" in the top bar | The speaker icon |
 | Back to the gallery | `Esc` or "Gallery" | "Gallery" |
 
 Every painting has its own link, e.g. [`#/horatii`](https://nikihu-a.github.io/louvre-after-dark/#/horatii). A lightweight version without 3D is at [`?static`](https://nikihu-a.github.io/louvre-after-dark/?static) (devices without WebGL 2 get it automatically).

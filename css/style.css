@@ -257,8 +257,6 @@ h1 em, h2 em {
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.hint i { font-style: normal; color: var(--gold); margin: 0 0.4em; }
-.hint .quiet { color: var(--ink-faint); }
 .intro .hint { transition: opacity 0.6s; }
 .intro.entered .hint { opacity: 0; }
 
