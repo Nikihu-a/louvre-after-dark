@@ -1,5 +1,5 @@
 // Sound: a soundtrack from each painting's own era, plus synthesized effects
-// (the clack of a gallery spotlight, a faint room tone). Browsers only allow
+// (a soft swell as the lights come up, a faint room tone). Browsers only allow
 // audio after a click or key press, so enable() must be called from one.
 
 // One loop per era, each written within a few decades of its paintings.
@@ -42,7 +42,7 @@ export class Sound {
       this.musicBus = this.ctx.createGain();
       this.musicBus.gain.value = MUSIC_LEVEL;
       this.musicBus.connect(this.master);
-      this.noise = this.makeNoise(2);
+      this.air = this.makeNoise(3, true);
       this.startRoom();
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
@@ -196,38 +196,27 @@ export class Sound {
     lfo.start();
   }
 
-  // The clack of a heavy relay switch, panned to where the light is.
-  click(pan = 0, strength = 1) {
+  // The lights coming up: one soft, unpitched breath of air that swells and
+  // fades. No attack, no pitch, so it sits under any of the music.
+  swell(duration = 2.8, strength = 1) {
     if (!this.on || !this.ctx) return;
     const c = this.ctx;
-    const t = c.currentTime + 0.005;
-    const out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-    if (out.pan) out.pan.value = Math.max(-1, Math.min(1, pan));
-    out.connect(this.master);
-
-    const n = c.createBufferSource();
-    n.buffer = this.noise;
-    const bp = c.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 1700 + Math.random() * 500;
-    bp.Q.value = 1.4;
-    const ng = c.createGain();
-    ng.gain.setValueAtTime(0, t);
-    ng.gain.linearRampToValueAtTime(0.55 * strength, t + 0.002);
-    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-    n.connect(bp).connect(ng).connect(out);
-    n.start(t, Math.random() * 1.5, 0.06);
-
-    const o = c.createOscillator();
-    o.type = "sine";
-    o.frequency.setValueAtTime(140, t);
-    o.frequency.exponentialRampToValueAtTime(48, t + 0.09);
-    const og = c.createGain();
-    og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(0.4 * strength, t + 0.004);
-    og.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-    o.connect(og).connect(out);
-    o.start(t);
-    o.stop(t + 0.16);
+    const t = c.currentTime + 0.02;
+    const src = c.createBufferSource();
+    src.buffer = this.air;
+    src.loop = true;
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.Q.value = 0.6;
+    lp.frequency.setValueAtTime(180, t);
+    lp.frequency.exponentialRampToValueAtTime(1300, t + duration * 0.55);
+    lp.frequency.exponentialRampToValueAtTime(240, t + duration);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14 * strength, t + duration * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(lp).connect(g).connect(this.master);
+    src.start(t);
+    src.stop(t + duration + 0.05);
   }
 }

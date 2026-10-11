@@ -243,7 +243,7 @@ function run(loadCard, loadFull, order, deep) {
   const S = {
     mode: "gallery", // gallery | entering | view | leaving | switching
     opening: deep >= 0 ? "done" : "waiting", // waiting | playing | done
-    openingT0: 0, clicked: new Array(N).fill(0),
+    openingT0: 0,
     power: new Array(N).fill(deep >= 0 ? 1 : 0), pull: deep >= 0 ? 1 : PULL,
     T: deep >= 0 ? -1 : OPENING_C, C: deep >= 0 ? -1 : OPENING_C, vel: 0, introO: 1,
     tx: 0, ty: 0, px: 0, py: 0,
@@ -388,6 +388,7 @@ function run(loadCard, loadFull, order, deep) {
     if (withSound) setSound(true);
     S.opening = "playing";
     S.openingT0 = performance.now();
+    sound.swell(OPENING * 0.9);
     // Dolly in while swinging back round the arc to the first painting.
     tween(OPENING, (k) => {
       const e = easeInOut(k);
@@ -579,7 +580,7 @@ function run(loadCard, loadFull, order, deep) {
     S.lights = S.lights === "lamp" ? "on" : "lamp";
     ui.lights.setAttribute("aria-pressed", String(S.lights === "on"));
     labelToggles();
-    sound.click(0, 0.7);
+    sound.swell(1.1, 0.55);
   };
   ui.lights.addEventListener("click", toggleLights);
   $("#view-back").addEventListener("click", () => leave());
@@ -855,22 +856,10 @@ function run(loadCard, loadFull, order, deep) {
     S.ccy = damp(S.ccy, S.cy, 18, dt);
     ui.cursor.style.transform = `translate(${S.ccx.toFixed(1)}px, ${S.ccy.toFixed(1)}px)`;
 
-    // Opening: spotlights switch on one by one, each with a clack.
+    // Opening: spotlights switch on one by one.
     if (S.opening === "playing") {
       const st = (now - S.openingT0) / 1000;
-      for (let i = 0; i < N; i++) {
-        S.power[i] = powerAt(i, st);
-        const x = st - lightDelay(i);
-        if (x >= 0 && S.clicked[i] === 0) {
-          S.clicked[i] = 1;
-          const [sx] = gallery.toScreen(gallery.cardPoint(i, 0, 0));
-          sound.click((sx / innerWidth) * 2 - 1, 1);
-        } else if (!reduceMotion && x >= 0.11 && S.clicked[i] === 1) {
-          S.clicked[i] = 2;
-          const [sx] = gallery.toScreen(gallery.cardPoint(i, 0, 0));
-          sound.click((sx / innerWidth) * 2 - 1, 0.45);
-        }
-      }
+      for (let i = 0; i < N; i++) S.power[i] = powerAt(i, st);
     }
 
     // Gallery travel, with a gentle snap to the nearest stop once input stops.
