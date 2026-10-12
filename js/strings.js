@@ -16,7 +16,6 @@ export const UI = {
   soundOnLabel: "Turn sound on",
   soundOffLabel: "Turn sound off",
   tagBy: "by Niki",
-  tag: "Louvre After Dark",
   back: "Gallery",
   explore: "Explore details",
   next: (date) => `Next · ${date}`,

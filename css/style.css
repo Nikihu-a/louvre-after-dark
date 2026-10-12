@@ -179,7 +179,6 @@ h1 em, h2 em {
   font-size: 15px;
   letter-spacing: 0.04em;
   color: var(--gold);
-  margin-left: 0.4em;
 }
 .toggle {
   display: inline-flex;
@@ -741,8 +740,6 @@ h1 em, h2 em {
 
 /* ---------- small screens ---------- */
 @media (max-width: 760px) {
-  .topbar .tag { font-size: 0; }
-  .topbar .tag em { font-size: 15px; margin: 0; }
   .topbar-right { gap: 12px; }
   .toggle-label, .toggle-dot { display: none; }
   .now-playing { font-size: 12px; max-width: 80vw; }
