@@ -409,6 +409,15 @@ h1 em, h2 em {
   line-height: 0.95;
   margin-top: 10px;
 }
+/* The painting's dominant colours, dark to light. */
+.palette { display: flex; gap: 7px; margin-top: 16px; }
+.palette span {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(243, 234, 219, 0.28);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
 .view-title .sub {
   margin-top: 16px;
   font-family: var(--serif);

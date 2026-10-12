@@ -1,11 +1,14 @@
 // The collection, in chronological order. Hotspot x/y are image uv (0..1, y down).
 // `tint` is the lamp color for the painting's era; `focus` is the depth value
 // that stays still while the camera moves (roughly the main figures' plane).
-// `music` picks the era soundtrack (see TRACKS in audio.js).
+// `music` picks the era soundtrack (see TRACKS in audio.js); `palette` is five
+// colours from the painting, dark to light (tools/make_palettes.py); optional
+// `motion` makes parts of the painting move a little (see immersive.js).
 
 export const PAINTINGS = [
   {
     id: "virgin-of-the-rocks",
+    palette: ["#1b1616", "#3d3427", "#793719", "#625842", "#b75021"],
     music: "renaissance",
     year: 1483,
     date: "c. 1483–1486",
@@ -31,6 +34,7 @@ export const PAINTINGS = [
   },
   {
     id: "mona-lisa",
+    palette: ["#241725", "#4e503d", "#808856", "#b88d41", "#deb95f"],
     music: "renaissance",
     year: 1503,
     date: "1503–1519",
@@ -56,6 +60,7 @@ export const PAINTINGS = [
   },
   {
     id: "wedding-at-cana",
+    palette: ["#3e3524", "#616452", "#8c6a42", "#7d7d65", "#92b9d7"],
     music: "renaissance",
     year: 1563,
     date: "1562–1563",
@@ -81,6 +86,7 @@ export const PAINTINGS = [
   },
   {
     id: "the-cheat",
+    palette: ["#0d0f10", "#2e2115", "#5d2c1e", "#8c4026", "#8d7f5b"],
     music: "baroque",
     year: 1635,
     date: "c. 1636–1638",
@@ -106,6 +112,7 @@ export const PAINTINGS = [
   },
   {
     id: "the-lacemaker",
+    palette: ["#2a3037", "#805e52", "#9b8378", "#b9aea7", "#d0c3b8"],
     music: "baroque",
     year: 1669,
     date: "c. 1669–1670",
@@ -131,6 +138,7 @@ export const PAINTINGS = [
   },
   {
     id: "cythera",
+    palette: ["#5c4821", "#785c2c", "#93733e", "#aa8c5f", "#acc6d4"],
     music: "rococo",
     year: 1717,
     date: "1717",
@@ -156,6 +164,7 @@ export const PAINTINGS = [
   },
   {
     id: "horatii",
+    palette: ["#292622", "#6f4726", "#575148", "#a06640", "#928368"],
     music: "neoclassical",
     year: 1784,
     date: "1784",
@@ -181,6 +190,7 @@ export const PAINTINGS = [
   },
   {
     id: "coronation",
+    palette: ["#312b12", "#4b3f19", "#773613", "#816223", "#a98136"],
     music: "neoclassical",
     year: 1805,
     date: "1805–1807",
@@ -206,7 +216,13 @@ export const PAINTINGS = [
   },
   {
     id: "medusa",
+    palette: ["#0e0d0d", "#2d211b", "#4a3826", "#8f765d", "#a88d73"],
     music: "romantic",
+    // Living motion: the raft rocks on the swell; the far sea ripples.
+    motion: {
+      rock: { pivot: [0.48, 0.62], amp: 0.006, speed: 0.9, bob: 0.0022, depth: [0.3, 0.5] },
+      waves: { band: [0.33, 0.47], amp: 0.0007, depthMax: 0.3 },
+    },
     year: 1818,
     date: "1818–1819",
     title: "The Raft of the Medusa",
@@ -231,6 +247,7 @@ export const PAINTINGS = [
   },
   {
     id: "liberty",
+    palette: ["#221c1a", "#4b3f33", "#5d534c", "#bc5a44", "#5b7cab"],
     music: "romantic",
     year: 1830,
     date: "1830",

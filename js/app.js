@@ -322,6 +322,18 @@ function run(loadCard, loadFull, order, deep) {
     $("#v-title").textContent = p.title;
     $("#v-artist").textContent = p.artist;
     $("#v-lead").textContent = p.lead;
+    const pal = $("#v-palette");
+    pal.textContent = "";
+    pal.hidden = !p.palette;
+    if (p.palette) {
+      pal.setAttribute("aria-label", `Colour palette: ${p.palette.join(", ")}`);
+      p.palette.forEach((hex) => {
+        const sw = el("span");
+        sw.style.background = hex;
+        sw.title = hex;
+        pal.append(sw);
+      });
+    }
     const next = PAINTINGS[i + 1];
     $("#n-eyebrow").textContent = next ? u.next(next.date) : u.endEyebrow;
     $("#n-title").textContent = next ? next.title : u.endTitle;

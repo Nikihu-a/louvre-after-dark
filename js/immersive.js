@@ -50,6 +50,11 @@ const FRAG = /* glsl */ `
   uniform float uInvert;    // 1 = reveal near-first instead of far-first
   uniform float uOpacity;
   uniform float uTime;
+  uniform float uImgAspect;
+  uniform vec4 uRock;       // amplitude (rad), speed, bob, unused
+  uniform vec2 uPivot;      // rocking pivot (image uv)
+  uniform vec2 uRockDepth;  // depth range that rocks
+  uniform vec4 uWave;       // band y0, y1, amplitude, max depth
   varying vec2 vUv;
 
   float mag(float h) {
@@ -57,7 +62,24 @@ const FRAG = /* glsl */ `
     return d0 / (d0 - uZoom);
   }
   vec2 at(vec2 b, float h) {
-    return uC + (b - uA) / mag(h) + uPar * (h - uFocus);
+    vec2 p = uC + (b - uA) / mag(h) + uPar * (h - uFocus);
+    // Living motion. Displacing the lookup inside the ray march keeps
+    // occlusion right: the rocking layer still hides what is behind it.
+    float w = smoothstep(uRockDepth.x, uRockDepth.y, h);
+    if (uRock.x > 0.0 && w > 0.0) {
+      float ang = sin(uTime * uRock.y) * uRock.x * w;
+      vec2 d = (p - uPivot) * vec2(uImgAspect, 1.0);
+      d = vec2(d.x * cos(ang) - d.y * sin(ang), d.x * sin(ang) + d.y * cos(ang));
+      p = uPivot + d / vec2(uImgAspect, 1.0);
+      p.y += sin(uTime * uRock.y * 1.3 + 1.0) * uRock.z * w;
+    }
+    if (uWave.z > 0.0) {
+      float band = smoothstep(uWave.x, uWave.x + 0.03, p.y) * (1.0 - smoothstep(uWave.y - 0.03, uWave.y, p.y));
+      float far = 1.0 - smoothstep(uWave.w - 0.08, uWave.w, h);
+      p.x += sin(p.y * 160.0 - uTime * 1.1) * uWave.z * band * far;
+      p.y += sin(p.x * 70.0 + uTime * 0.8) * uWave.z * 0.6 * band * far;
+    }
+    return p;
   }
   float depthAt(vec2 p) { return texture2D(uDepth, p).r; }
 
@@ -213,6 +235,11 @@ export class Immersive {
         uInvert: { value: 0 },
         uOpacity: { value: 0 },
         uTime: { value: 0 },
+        uImgAspect: { value: 1 },
+        uRock: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uPivot: { value: new THREE.Vector2(0.5, 0.5) },
+        uRockDepth: { value: new THREE.Vector2(0.4, 0.6) },
+        uWave: { value: new THREE.Vector4(0, 0, 0, 0) },
       },
     });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
@@ -235,6 +262,15 @@ export class Immersive {
     u.uHasPlate.value = plate && bgDepth ? 1 : 0;
     u.uFocus.value = painting.focus;
     u.uTint.value.setRGB(...painting.tint);
+    u.uImgAspect.value = painting.aspect;
+    const rock = painting.motion && painting.motion.rock;
+    const waves = painting.motion && painting.motion.waves;
+    u.uRock.value.set(rock ? rock.amp : 0, rock ? rock.speed : 0, rock ? rock.bob : 0, 0);
+    if (rock) {
+      u.uPivot.value.set(...rock.pivot);
+      u.uRockDepth.value.set(...rock.depth);
+    }
+    u.uWave.value.set(waves ? waves.band[0] : 0, waves ? waves.band[1] : 0, waves ? waves.amp : 0, waves ? waves.depthMax : 0);
     u.uTexel.value.set(1 / depth.image.width, 1 / depth.image.height);
     const { w, h, data } = depthPixels;
     this.sampleDepth = (x, y) => {
