@@ -531,21 +531,6 @@ h1 em, h2 em {
 }
 .chapters button.on::before { background: var(--gold); border-color: var(--gold); transform: scale(1.4); }
 
-.view-foot {
-  position: absolute;
-  left: var(--gutter);
-  right: var(--gutter);
-  bottom: max(18px, env(safe-area-inset-bottom));
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-}
-.view-meta { max-width: 60ch; }
-.view-hint { text-align: right; white-space: nowrap; }
-.view-hint .coarse { display: none; }
 
 /* ---------- loupe & cursor ---------- */
 .cursor {
@@ -769,9 +754,6 @@ h1 em, h2 em {
   .view-panel { bottom: 76px; }
   .view-detail { padding: 18px 20px 20px; }
   .view-detail h3 { font-size: 24px; }
-  .view-hint .fine, .view-meta { display: none; }
-  .view-hint .coarse { display: inline; }
-  .view-foot { justify-content: center; }
   .chapters { top: auto; bottom: 30%; }
   .view-back kbd { display: none; }
   .wall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 16px; }
@@ -787,7 +769,7 @@ h1 em, h2 em {
 
 @media (max-height: 640px) {
   .view-title h2 { font-size: clamp(36px, 9vh, 72px); }
-  .view-title .lead, .view-meta { display: none; }
+  .view-title .lead { display: none; }
   .view-title .pill { margin-top: 14px; }
   .view-panel { bottom: 52px; }
   .view-detail { padding: 16px 20px 18px; }

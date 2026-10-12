@@ -322,7 +322,6 @@ function run(loadCard, loadFull, order, deep) {
     $("#v-title").textContent = p.title;
     $("#v-artist").textContent = p.artist;
     $("#v-lead").textContent = p.lead;
-    $("#v-meta").textContent = u.meta(p, p.inv);
     const next = PAINTINGS[i + 1];
     $("#n-eyebrow").textContent = next ? u.next(next.date) : u.endEyebrow;
     $("#n-title").textContent = next ? next.title : u.endTitle;
