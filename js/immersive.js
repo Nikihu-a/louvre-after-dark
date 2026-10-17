@@ -55,6 +55,8 @@ const FRAG = /* glsl */ `
   uniform vec2 uPivot;      // rocking pivot (image uv)
   uniform vec2 uRockDepth;  // depth range that rocks
   uniform vec4 uWave;       // band y0, y1, amplitude, max depth
+  uniform vec4 uSway[3];    // soft local sway (feathers): x, y (image uv), radius, amplitude
+  uniform vec2 uSwayK;      // speed, min depth that sways
   varying vec2 vUv;
 
   float mag(float h) {
@@ -78,6 +80,17 @@ const FRAG = /* glsl */ `
       float far = 1.0 - smoothstep(uWave.w - 0.08, uWave.w, h);
       p.x += sin(p.y * 160.0 - uTime * 1.1) * uWave.z * band * far;
       p.y += sin(p.x * 70.0 + uTime * 0.8) * uWave.z * 0.6 * band * far;
+    }
+    // Feathers: a slow, uneven sway inside a soft circle, near layers only.
+    for (int i = 0; i < 3; i++) {
+      vec4 s = uSway[i];
+      if (s.w <= 0.0) continue;
+      vec2 dv = (p - s.xy) * vec2(uImgAspect, 1.0);
+      float g = exp(-dot(dv, dv) / (s.z * s.z));
+      float wd = smoothstep(uSwayK.y - 0.08, uSwayK.y, h);
+      float ph = uTime * uSwayK.x + float(i) * 1.7;
+      float gust = 0.65 + 0.35 * sin(uTime * 0.37 + float(i));
+      p += vec2(sin(ph + p.y * 18.0), 0.45 * cos(ph * 0.83 + p.x * 13.0)) * s.w * g * wd * gust;
     }
     return p;
   }
@@ -240,6 +253,8 @@ export class Immersive {
         uPivot: { value: new THREE.Vector2(0.5, 0.5) },
         uRockDepth: { value: new THREE.Vector2(0.4, 0.6) },
         uWave: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uSway: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+        uSwayK: { value: new THREE.Vector2(1, 0.3) },
       },
     });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
@@ -271,6 +286,12 @@ export class Immersive {
       u.uRockDepth.value.set(...rock.depth);
     }
     u.uWave.value.set(waves ? waves.band[0] : 0, waves ? waves.band[1] : 0, waves ? waves.amp : 0, waves ? waves.depthMax : 0);
+    const sway = (painting.motion && painting.motion.sway) || null;
+    u.uSway.value.forEach((v, k) => {
+      const s = sway && sway.regions[k];
+      v.set(s ? s.at[0] : 0, s ? s.at[1] : 0, s ? s.r : 0, s ? s.amp : 0);
+    });
+    if (sway) u.uSwayK.value.set(sway.speed, sway.depthMin);
     u.uTexel.value.set(1 / depth.image.width, 1 / depth.image.height);
     const { w, h, data } = depthPixels;
     this.sampleDepth = (x, y) => {

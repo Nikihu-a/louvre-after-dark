@@ -4,6 +4,7 @@ import { UI } from "./strings.js";
 import { Sound, TRACKS } from "./audio.js";
 import { Gallery, CARD_H } from "./gallery.js";
 import { Immersive, PARALLAX, fitHeight } from "./immersive.js";
+import { Case } from "./case.js";
 
 const N = PAINTINGS.length;
 const $ = (s) => document.querySelector(s);
@@ -227,6 +228,17 @@ function run(loadCard, loadFull, order, deep) {
     { dpr: 0.75, steps: 20 },
   ];
   const immersive = new Immersive(renderer, { steps: TIERS[0].steps });
+  const kase = new Case({
+    root: $("#case"),
+    project: (x, y) => immersive.project(x, y),
+    chime: (level) => sound.chime(level),
+    finePointer,
+    onState: (state) => {
+      ui.view.classList.toggle("casing", state !== "off");
+      if (state === "off") setChapter(0, true);
+      if (state === "search" || state === "intro") sound.swell(1.2, 0.4);
+    },
+  });
 
   // Stream card textures in, nearest first.
   (async () => {
@@ -339,6 +351,9 @@ function run(loadCard, loadFull, order, deep) {
     $("#n-title").textContent = next ? next.title : u.endTitle;
     $("#n-go-label").textContent = next ? u.continue : u.leave;
 
+    kase.load(p);
+    $("#case-open").hidden = !p.case;
+
     ui.hotspots.textContent = "";
     hotspotBtns = p.hotspots.map((h, k) => {
       const b = el("button", "hotspot", String(k + 1));
@@ -379,6 +394,7 @@ function run(loadCard, loadFull, order, deep) {
   function viewTarget() {
     const Lt = LIGHT[S.lights];
     const p = PAINTINGS[S.current];
+    if (kase.active) return kase.cam(S.lights);
     if (S.chapter === 0) return { zoom: 0.04, cx: 0.5, cy: 0.5, ambient: Lt.overview[0], lamp: Lt.overview[1] };
     if (S.chapter <= 3) {
       const h = p.hotspots[S.chapter - 1];
@@ -470,6 +486,8 @@ function run(loadCard, loadFull, order, deep) {
 
   function leave(after) {
     if (S.mode !== "view") return;
+    kase.exit(true);
+    ui.view.classList.remove("casing");
     S.mode = "leaving";
     S.loupeTarget = 0;
     ui.view.classList.remove("on");
@@ -500,6 +518,8 @@ function run(loadCard, loadFull, order, deep) {
 
   function switchTo(j) {
     if (S.mode !== "view" || j < 0 || j >= N || j === S.current) return;
+    kase.exit(true);
+    ui.view.classList.remove("casing");
     S.mode = "switching";
     S.loupeTarget = 0;
     ui.view.classList.add("swapping");
@@ -596,6 +616,7 @@ function run(loadCard, loadFull, order, deep) {
   ui.lights.addEventListener("click", toggleLights);
   $("#view-back").addEventListener("click", () => leave());
   ui.view.querySelector("[data-step]").addEventListener("click", () => setChapter(1));
+  $("#case-open").addEventListener("click", () => { if (S.mode === "view") kase.start(); });
   $("#n-go").addEventListener("click", continueNext);
 
   const snapValue = (T) => {
@@ -623,7 +644,11 @@ function run(loadCard, loadFull, order, deep) {
       S.lastInput = performance.now();
     } else {
       e.preventDefault();
-      if (S.mode === "view") {
+      if (kase.active) {
+        // Let a long case file scroll; otherwise the wheel does nothing here.
+        const f = e.target instanceof Element && e.target.closest(".case-file");
+        if (f) f.scrollTop += d;
+      } else if (S.mode === "view") {
         S.wheelAcc += d;
         const now = performance.now();
         if (Math.abs(S.wheelAcc) > 50 && now - S.lastStep > 650) {
@@ -661,6 +686,11 @@ function run(loadCard, loadFull, order, deep) {
         if (i >= 0 && i < N) openPainting(i);
       }
     } else if (S.mode === "view") {
+      if (kase.active) {
+        if (onButton && (k === "Enter" || k === " ")) return;
+        if (kase.key(k)) e.preventDefault();
+        return;
+      }
       if (["ArrowDown", "PageDown"].includes(k) || (k === " " && !onButton)) { e.preventDefault(); stepChapter(1); }
       else if (["ArrowUp", "PageUp"].includes(k)) { e.preventDefault(); stepChapter(-1); }
       else if (k === "ArrowRight") switchTo(S.current + 1);
@@ -672,7 +702,7 @@ function run(loadCard, loadFull, order, deep) {
   // Pointer: lamp + parallax everywhere; drag to travel the gallery; in the
   // view, press-and-hold for the loupe and swipe for chapters / paintings.
   const drag = { on: false, id: null, x0: 0, y0: 0, T0: 0, moved: false, axis: null, timer: 0 };
-  const uiTarget = (t) => t.closest && t.closest("button, a, .wall, .scrub-track");
+  const uiTarget = (t) => t.closest && t.closest("button, a, .wall, .scrub-track, .case-panel, .case-hud");
 
   function pointerAt(x, y) {
     S.tlx = x / innerWidth;
@@ -710,7 +740,7 @@ function run(loadCard, loadFull, order, deep) {
     if (e.button > 0 || uiTarget(e.target)) return;
     pointerAt(e.clientX, e.clientY);
     Object.assign(drag, { on: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, T0: S.T, moved: false, axis: null });
-    if (S.mode === "view") {
+    if (S.mode === "view" && !kase.active) {
       drag.timer = setTimeout(() => {
         if (drag.on && (!drag.moved || e.pointerType === "mouse")) {
           S.loupe = [S.cx / innerWidth, S.cy / innerHeight];
@@ -742,6 +772,8 @@ function run(loadCard, loadFull, order, deep) {
           else { S.T = hit; S.lastInput = performance.now(); }
         }
       }
+    } else if (S.mode === "view" && kase.active) {
+      if (!drag.moved && e.type === "pointerup") kase.tap(e.clientX, e.clientY);
     } else if (S.mode === "view" && drag.moved && e.pointerType !== "mouse") {
       if (drag.axis === "y" && Math.abs(dy) > 50) stepChapter(dy < 0 ? 1 : -1);
       else if (drag.axis === "x" && Math.abs(dx) > 70) switchTo(S.current + (dx < 0 ? 1 : -1));
@@ -1001,6 +1033,13 @@ function run(loadCard, loadFull, order, deep) {
         b.style.pointerEvents = inside && vis > 0.5 ? "auto" : "none";
       });
     }
+
+    // Investigation: dwell to find, hot / cold on the cursor ring.
+    // Real elapsed time, so a slow frame rate doesn't slow the dwell down.
+    const ks = kase.update(Math.min(0.25, dtMs / 1000), S.cx, S.cy, finePointer && now - S.lastMove < 4000, S.mode === "view" && S.viewOpacity > 0.9);
+    ui.cursor.style.setProperty("--warm", ks.warmth.toFixed(3));
+    ui.cursor.style.setProperty("--dwell", ks.dwell.toFixed(3));
+    ui.cursor.classList.toggle("searching", kase.state === "search");
 
     // Cursor label over the centered card.
     if (finePointer) {

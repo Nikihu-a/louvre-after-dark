@@ -196,6 +196,30 @@ export class Sound {
     lfo.start();
   }
 
+  // A found clue: a soft bell, like a glass touched with a fingernail.
+  // level 1 = evidence, 2 = bonus, 3 = case solved (a rising pair).
+  chime(level = 1) {
+    if (!this.on || !this.ctx) return;
+    const c = this.ctx;
+    const notes = level === 3 ? [659.25, 987.77] : level === 2 ? [880, 1318.5] : [783.99];
+    notes.forEach((f, k) => {
+      const t = c.currentTime + 0.02 + k * 0.16;
+      [1, 2.76].forEach((h, j) => {
+        const o = c.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f * h;
+        const g = c.createGain();
+        const peak = (j ? 0.012 : 0.045) * (level === 3 ? 1.2 : 1);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + (j ? 0.7 : 1.8));
+        o.connect(g).connect(this.master);
+        o.start(t);
+        o.stop(t + 1.9);
+      });
+    });
+  }
+
   // The lights coming up: one soft, unpitched breath of air that swells and
   // fades. No attack, no pitch, so it sits under any of the music.
   swell(duration = 2.8, strength = 1) {

@@ -5,6 +5,75 @@
 // colours from the painting, dark to light (tools/make_palettes.py); optional
 // `motion` makes parts of the painting move a little (see immersive.js).
 
+// "Find the cheat": an investigation played inside La Tour's painting (see
+// case.js). Clue x/y are image uv; `r` is how close the lamp must come, as a
+// fraction of the screen's shorter side. `look` draws a glance between two
+// points once the clue is found. A `bonus` clue is not needed to finish.
+const CHEAT_CASE = {
+  kicker: "An investigation",
+  title: "Someone at this table is cheating.",
+  intro: "Four players, no words. The man on the left has just turned to look straight at you. Take the lamp and search the table for proof: hold the light over anything suspicious.",
+  start: "Take the lamp",
+  searchHint: "Search the table with your lamp",
+  searchHintTouch: "Tap anything suspicious",
+  progress: (n, t) => `Evidence ${n} / ${t}`,
+  keepSearching: "Keep searching",
+  toAccuse: "Make your accusation",
+  clues: [
+    { id: "ace", x: 0.055, y: 0.745, r: 0.09, zoom: 0.46,
+      title: "The Ace Behind His Back",
+      text: "Tucked in his belt, the ace of diamonds slides into his fingers. Look at the light: it falls full on his back and hands, the very parts he hides from the table, while his face stays in shadow. La Tour lets the light tell the truth the man won't." },
+    { id: "hand", x: 0.36, y: 0.44, r: 0.075, zoom: 0.48,
+      title: "A Hand of Diamonds",
+      text: "The cards he shows the room are diamonds. In the game being played, an ace, a six and a seven of one suit made a winning hand. The ace at his back isn't luck. It is the missing piece.",
+      look: { from: [0.055, 0.745], to: [0.36, 0.44] } },
+    { id: "glance", x: 0.567, y: 0.34, r: 0.07, zoom: 0.5,
+      title: "Eyes That Slide Sideways",
+      text: "The courtesan isn't looking at her cards. Her eyes slide toward the maid, who answers with an oblique look of her own. Two women, one silent conversation, and it isn't about the game.",
+      look: { from: [0.567, 0.34], to: [0.44, 0.215] } },
+    { id: "finger", x: 0.39, y: 0.64, r: 0.07, zoom: 0.48,
+      title: "A Finger That Points",
+      text: "Her hand reaches out across the table, one finger extended toward the card sharp. With her finger and her gaze she points to him: the signal that the moment has come.",
+      look: { from: [0.39, 0.64], to: [0.225, 0.36] } },
+    { id: "wine", x: 0.43, y: 0.485, r: 0.065, zoom: 0.5,
+      title: "Wine, Poured to Distract",
+      text: "The maid arrives with a glass and a flask. Wine is the second of the young man's three temptations. The first is the game itself; the third sits beside him in pearls." },
+    { id: "aigrette", bonus: true, x: 0.34, y: 0.055, r: 0.06, zoom: 0.44,
+      title: "A Feather From Another Century",
+      text: "La Tour never painted this plume. Probably in the early 1700s, someone added a strip about 10 cm high along the top of the canvas to suit the taste of the day, and gave the maid's turban a jewel and an aigrette to fill it." },
+  ],
+  accuse: {
+    title: "Who is in on it?",
+    text: "Tap every player you accuse, then lay down your verdict.",
+    button: "Accuse",
+    pick: "Accused",
+  },
+  suspects: [
+    { id: "cheat", name: "The card sharp", x: 0.225, y: 0.36, guilty: true,
+      verdict: "Ace in his belt, eyes on you. He makes us his accomplices." },
+    { id: "maid", name: "The maid", x: 0.435, y: 0.215, guilty: true,
+      verdict: "She keeps the wine flowing and the signals moving." },
+    { id: "courtesan", name: "The courtesan", x: 0.567, y: 0.33, guilty: true,
+      verdict: "She runs the game with a look and a finger." },
+    { id: "victim", name: "The young man", x: 0.84, y: 0.34, guilty: false,
+      verdict: "Silk, plumes, a pile of gold: the only face at this table without a secret." },
+  ],
+  right: { title: "Three against one.", text: "You read the table. Everyone here is playing a game except the one with the money." },
+  wrong: { title: "Not quite. It's three against one.", text: "Only the young man is innocent. Everyone else at the table is working him together." },
+  fileTitle: "The case file",
+  file: [
+    { h: "Gambling, wine, desire",
+      p: "The scene is a moral lesson dressed as a card game: the three temptations waiting for a young man with money. The theme of card cheats came from Caravaggio, whose Cardsharps of the 1590s set the pattern La Tour follows here: half-length figures, a plain dark ground, light raking in from the side." },
+    { h: "Daylight, not candlelight",
+      p: "La Tour is famous for nights lit by a single flame. This is not one of them. The light here is cool and clear, and it is selective: it exposes the cheat's hands and leaves his face in the dark." },
+    { h: "Three hundred years of silence",
+      p: "After his death in 1652 La Tour was almost entirely forgotten, his pictures credited to other painters. The art historian Hermann Voss began to restore his name in 1914, and a 1934 exhibition in Paris brought him back to the public. The collector Pierre Landry bought this canvas from a Paris dealer in 1926; the Louvre acquired it in 1972, during La Tour's first retrospective." },
+    { h: "A second table",
+      p: "La Tour painted the scene twice. The other version, with an ace of clubs, differs in colours and costume and has been in the Kimbell Art Museum in Fort Worth, Texas, since 1981." },
+  ],
+  again: "Back to the painting",
+};
+
 export const PAINTINGS = [
   {
     id: "virgin-of-the-rocks",
@@ -88,6 +157,20 @@ export const PAINTINGS = [
     id: "the-cheat",
     palette: ["#0d0f10", "#2e2115", "#5d2c1e", "#8c4026", "#8d7f5b"],
     music: "baroque",
+    // Living motion: the three feathers stir, as if someone just sat down.
+    motion: {
+      sway: {
+        speed: 1.25,
+        depthMin: 0.3,
+        regions: [
+          { at: [0.905, 0.15], r: 0.085, amp: 0.0032 }, // the young man's plume
+          { at: [0.635, 0.205], r: 0.055, amp: 0.0022 }, // the courtesan's red feather
+          { at: [0.34, 0.05], r: 0.045, amp: 0.0028 }, // the maid's aigrette
+        ],
+      },
+    },
+    // An investigation: search the table with the lamp, then name the cheats.
+    case: CHEAT_CASE,
     year: 1635,
     date: "c. 1636–1638",
     title: "The Cheat with the Ace of Diamonds",

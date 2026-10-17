@@ -437,7 +437,7 @@ h1 em, h2 em {
   color: var(--ink-dim);
   max-width: 50ch;
 }
-.view-title .pill { margin-top: 24px; }
+.view-title .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 
 .view-detail {
   padding: 24px 26px 26px;
@@ -770,7 +770,7 @@ h1 em, h2 em {
 @media (max-height: 640px) {
   .view-title h2 { font-size: clamp(36px, 9vh, 72px); }
   .view-title .lead { display: none; }
-  .view-title .pill { margin-top: 14px; }
+  .view-title .pills { margin-top: 14px; }
   .view-panel { bottom: 52px; }
   .view-detail { padding: 16px 20px 18px; }
   .view-detail h3 { font-size: 24px; margin: 6px 0 8px; }
@@ -779,4 +779,242 @@ h1 em, h2 em {
 
 @media (prefers-reduced-motion: reduce) {
   .grain, .hotspot::after { animation: none; }
+}
+
+
+/* ---------- investigation ---------- */
+/* A gold pill: the way into a painting that can be played. */
+.pill-case { border-color: rgba(217, 178, 111, 0.75); background: rgba(217, 178, 111, 0.16); color: #ffe7bd; }
+.pill-case span { background: var(--gold); color: #111; }
+.pill-case:hover { background: rgba(217, 178, 111, 0.3); border-color: var(--gold); }
+.pill.ghost { background: transparent; border-color: rgba(255, 255, 255, 0.18); color: var(--ink-dim); }
+.pill:disabled { opacity: 0.35; pointer-events: none; }
+
+/* While investigating, the tour's own furniture steps aside. */
+.view.casing .view-panel, .view.casing .hotspot, .view.casing .chapters { opacity: 0 !important; pointer-events: none !important; }
+
+.case { position: absolute; inset: 0; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 0.6s var(--ease), visibility 0.6s; }
+.case.on { opacity: 1; visibility: visible; }
+
+.case-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.case-lines path {
+  fill: none;
+  stroke: #ffd894;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 120, 0.85));
+  transition: stroke-dashoffset 1.6s var(--ease) 0.5s, opacity 0.4s 0.5s;
+}
+.case-lines path.on { stroke-dashoffset: 0; opacity: 0.85; }
+.case-lines path.on.dim { opacity: 0.25; }
+
+.case-marks { position: absolute; inset: 0; }
+.case-mark, .case-hint-ring, .case-suspect {
+  position: absolute;
+  left: 0; top: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s;
+}
+.case-mark.on, .case-hint-ring.on, .case-suspect.on { opacity: 1; pointer-events: auto; }
+.case-mark {
+  width: 16px; height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(217, 178, 111, 0.22), 0 0 18px rgba(255, 210, 140, 0.9);
+}
+.case-mark::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #1a130a; }
+.case-hint-ring {
+  width: 64px; height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 220, 160, 0.9);
+  animation: hint 1.8s ease-in-out infinite;
+}
+@keyframes hint { 50% { box-shadow: 0 0 0 10px rgba(255, 210, 140, 0.12), 0 0 30px rgba(255, 210, 140, 0.4); } }
+
+/* Suspects: a ring on each face, a name beneath. */
+.case-suspect { width: 0; height: 0; }
+.case-suspect .ring {
+  position: absolute;
+  left: -38px; top: -38px;
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  border: 1px solid rgba(243, 234, 219, 0.7);
+  box-shadow: 0 0 22px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.3s, box-shadow 0.3s, background 0.3s, transform 0.4s var(--ease);
+}
+.case-suspect .name {
+  position: absolute;
+  top: 46px; left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(10, 8, 6, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--ink);
+  transition: background 0.3s, color 0.3s;
+}
+.case-suspect.edge-r .name { left: 26px; transform: translateX(-100%); }
+.case-suspect.edge-l .name { left: -26px; transform: none; }
+.case-suspect:hover .ring { border-color: var(--gold); transform: scale(1.06); }
+.case-suspect.picked .ring { border: 2px solid var(--gold); background: rgba(217, 178, 111, 0.12); box-shadow: 0 0 0 6px rgba(217, 178, 111, 0.18), 0 0 30px rgba(255, 200, 120, 0.6); }
+.case-suspect.picked .name { background: var(--gold); color: #111; }
+.case-suspect.guilty .ring { border: 2px solid #e0674b; box-shadow: 0 0 26px rgba(224, 103, 75, 0.6); background: none; }
+.case-suspect.innocent .ring { border: 2px solid #9fc4a2; box-shadow: 0 0 26px rgba(159, 196, 162, 0.5); background: none; }
+.is-file .case-suspect { pointer-events: none; }
+
+/* HUD while searching. */
+.case-hud {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(26px, 5vh, 48px);
+  transform: translate(-50%, 10px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 12px 10px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 178, 111, 0.3);
+  background: rgba(10, 8, 6, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.5s, transform 0.6s var(--ease);
+}
+.is-search .case-hud { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.case-count { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.case-hint { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--ink-dim); }
+.case-hint-btn {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--ink-dim);
+  transition: color 0.3s, border-color 0.3s;
+}
+.case-hint-btn:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.5); }
+
+.case-exit {
+  position: absolute;
+  top: max(54px, calc(env(safe-area-inset-top) + 40px));
+  right: var(--gutter);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding: 6px 0;
+  pointer-events: auto;
+  transition: color 0.3s;
+}
+.case-exit span:first-child { font-size: 16px; letter-spacing: 0; margin-right: 4px; }
+.case-exit:hover { color: var(--ink); }
+.is-file .case-exit { z-index: 2; }
+
+/* Panels share the tour's language: serif titles, a dark glass card. */
+.case-panel {
+  position: absolute;
+  left: var(--gutter);
+  bottom: clamp(70px, 12vh, 130px);
+  max-width: min(560px, calc(100vw - 2 * var(--gutter)));
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s var(--ease), transform 0.9s var(--ease);
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.7);
+}
+.case-panel.on { opacity: 1; transform: none; transition-delay: 0.3s; pointer-events: auto; }
+.case-panel h2 { font-family: var(--serif); font-weight: 300; font-size: clamp(38px, 5vw, 72px); line-height: 1; margin: 12px 0 16px; }
+.case-panel .lead { font-size: 15px; line-height: 1.7; color: var(--ink-dim); max-width: 46ch; }
+.case-panel .pill { margin-top: 24px; }
+
+.case-clue, .case-accuse {
+  padding: 24px 26px 26px;
+  max-width: min(430px, calc(100vw - 2 * var(--gutter)));
+  background: linear-gradient(160deg, rgba(20, 16, 12, 0.8), rgba(10, 8, 6, 0.6));
+  border: 1px solid rgba(217, 178, 111, 0.28);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-shadow: none;
+}
+.case-clue .num { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
+.case-clue h3, .case-accuse h3 { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; margin: 10px 0 12px; }
+.case-clue .text, .case-accuse .text { font-size: 14px; line-height: 1.7; color: var(--ink-dim); }
+.case-clue .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.case-clue .actions .pill { margin-top: 0; }
+.case-accuse { left: 50%; transform: translate(-50%, 18px); bottom: clamp(26px, 5vh, 48px); text-align: center; }
+.case-accuse.on { transform: translate(-50%, 0); }
+
+/* The case file: a dark sheet on the right, the painting still glowing beside it. */
+.case-file {
+  left: auto;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(520px, 100vw);
+  max-width: none;
+  padding: calc(max(54px, env(safe-area-inset-top) + 40px) + 40px) clamp(24px, 4vw, 52px) 56px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-user-select: text;
+  user-select: text;
+  background: linear-gradient(90deg, rgba(7, 6, 10, 0.55), rgba(7, 6, 10, 0.94) 22%);
+  text-shadow: none;
+  transform: translateX(24px);
+}
+.case-file.on { transform: none; }
+.case-file .file-head h2 { margin-top: 0; }
+.file-roll { list-style: none; margin: 30px 0 8px; display: grid; gap: 14px; }
+.file-roll li { padding: 14px 16px; border-left: 2px solid; background: rgba(255, 255, 255, 0.03); }
+.file-roll li.guilty { border-color: #e0674b; }
+.file-roll li.innocent { border-color: #9fc4a2; }
+.file-roll b { font-family: var(--serif); font-weight: 500; font-size: 20px; }
+.file-roll .tag { margin-left: 10px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
+.file-roll li.guilty .tag { color: #e9907b; }
+.file-roll li.innocent .tag { color: #b5d6b7; }
+.file-roll p { margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--ink-dim); }
+.file-sections { margin-top: 40px; padding-top: 28px; border-top: 1px solid rgba(217, 178, 111, 0.25); }
+.file-sections .eyebrow { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
+.file-sections section { margin-top: 26px; }
+.file-sections h4 { font-family: var(--serif); font-weight: 500; font-size: 24px; line-height: 1.15; }
+.file-sections p { margin-top: 8px; font-size: 14px; line-height: 1.75; color: var(--ink-dim); }
+
+/* The lamp warms near a clue and fills as it rests on one. */
+.cursor.searching {
+  width: 46px; height: 46px;
+  margin: -23px 0 0 -23px;
+  border-color: rgba(255, 226, 170, calc(0.35 + var(--warm, 0) * 0.65));
+  box-shadow: 0 0 calc(var(--warm, 0) * 34px) rgba(255, 200, 120, calc(var(--warm, 0) * 0.8)),
+              inset 0 0 0 calc(var(--dwell, 0) * 23px) rgba(255, 214, 150, 0.28);
+}
+
+@media (max-width: 760px) {
+  .case-hud { gap: 12px; padding: 8px 8px 8px 16px; bottom: 22px; }
+  .case-hint { display: none; }
+  .case-panel { bottom: 90px; }
+  .case-panel .lead { font-size: 14px; }
+  .case-clue, .case-accuse { padding: 18px 20px 20px; }
+  .case-clue h3, .case-accuse h3 { font-size: 24px; }
+  .case-accuse { width: calc(100vw - 2 * var(--gutter)); bottom: 22px; }
+  .case-suspect .ring { left: -26px; top: -26px; width: 52px; height: 52px; }
+  .case-suspect .name { top: 32px; font-size: 9px; letter-spacing: 0.12em; padding: 4px 8px; }
+  .case-file { background: rgba(7, 6, 10, 0.94); }
+  .case-exit span:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-hint-ring { animation: none; }
+  .case-lines path { transition: opacity 0.4s; }
 }
