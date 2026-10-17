@@ -11,8 +11,8 @@
   --ink-faint: rgba(243, 234, 219, 0.32);
   --gold: #d9b26f;
   --night: #07060a;
-  --serif: "Cormorant", "Times New Roman", serif;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --serif: "Cormorant", "Times New Roman", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
   --gutter: clamp(16px, 4vw, 56px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -799,17 +799,16 @@ h1 em, h2 em {
 .case-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .case-lines path {
   fill: none;
-  stroke: #ffd894;
-  stroke-width: 1.4;
+  stroke-width: 0.8;
   stroke-linecap: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   opacity: 0;
-  filter: drop-shadow(0 0 6px rgba(255, 200, 120, 0.85));
-  transition: stroke-dashoffset 1.6s var(--ease) 0.5s, opacity 0.4s 0.5s;
+  filter: drop-shadow(0 0 3px rgba(255, 210, 150, 0.45));
+  transition: stroke-dashoffset 2s var(--ease) 0.5s, opacity 0.6s 0.5s;
 }
-.case-lines path.on { stroke-dashoffset: 0; opacity: 0.85; }
-.case-lines path.on.dim { opacity: 0.25; }
+.case-lines path.on { stroke-dashoffset: 0; opacity: 0.55; }
+.case-lines path.on.dim { opacity: 0.18; }
 
 .case-marks { position: absolute; inset: 0; }
 .case-mark, .case-hint-ring, .case-suspect {
@@ -820,22 +819,44 @@ h1 em, h2 em {
   transition: opacity 0.5s;
 }
 .case-mark.on, .case-hint-ring.on, .case-suspect.on { opacity: 1; pointer-events: auto; }
+/* A found clue: a small hollow ring, quiet enough to sit on a face. */
 .case-mark {
-  width: 16px; height: 16px;
-  margin: -8px 0 0 -8px;
+  width: 12px; height: 12px;
+  margin: -6px 0 0 -6px;
   border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 4px rgba(217, 178, 111, 0.22), 0 0 18px rgba(255, 210, 140, 0.9);
+  border: 1px solid rgba(255, 226, 176, 0.75);
+  box-shadow: 0 0 8px rgba(255, 210, 150, 0.35);
+  transition: opacity 0.5s, transform 0.3s;
 }
-.case-mark::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #1a130a; }
+.case-mark::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; } /* bigger tap target */
+.case-mark.on { opacity: 0.7; }
+.case-mark.on:hover { opacity: 1; background: rgba(255, 226, 176, 0.25); }
 .case-hint-ring {
-  width: 64px; height: 64px;
-  margin: -32px 0 0 -32px;
+  width: 92px; height: 92px;
+  margin: -46px 0 0 -46px;
   border-radius: 50%;
-  border: 1px dashed rgba(255, 220, 160, 0.9);
-  animation: hint 1.8s ease-in-out infinite;
+  border: 2px solid rgba(255, 220, 160, 0.95);
+  background: radial-gradient(circle, rgba(255, 214, 150, 0.18), rgba(255, 214, 150, 0) 70%);
+  animation: hint 1.4s ease-in-out infinite;
 }
-@keyframes hint { 50% { box-shadow: 0 0 0 10px rgba(255, 210, 140, 0.12), 0 0 30px rgba(255, 210, 140, 0.4); } }
+.case-hint-ring .label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 10px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #111;
+}
+.case-hint-ring.edge-l .label { left: 0; transform: none; }
+.case-hint-ring.edge-r .label { left: auto; right: 0; transform: none; }
+@keyframes hint { 50% { box-shadow: 0 0 0 14px rgba(255, 210, 140, 0.16), 0 0 44px rgba(255, 210, 140, 0.65); } }
 
 /* Suspects: a ring on each face, a name beneath. */
 .case-suspect { width: 0; height: 0; }
@@ -1018,3 +1039,31 @@ h1 em, h2 em {
   .case-hint-ring { animation: none; }
   .case-lines path { transition: opacity 0.4s; }
 }
+
+
+/* ---------- language ---------- */
+/* The language switch is always a word, on phones too. */
+.toggle-lang { min-width: 34px; justify-content: center; }
+.toggle-lang .toggle-label { display: inline !important; letter-spacing: 0.12em; }
+html.lang-zh .toggle-lang .toggle-label { font-family: var(--sans); }
+
+/* Chinese reads better without the wide tracking and italics used for Latin capitals. */
+html.lang-zh .view-detail p:last-child,
+html.lang-zh .view-title .lead,
+html.lang-zh .case-panel .lead,
+html.lang-zh .case-clue .text,
+html.lang-zh .case-accuse .text,
+html.lang-zh .file-roll p,
+html.lang-zh .file-sections p { line-height: 1.85; letter-spacing: 0.02em; }
+html.lang-zh .view-detail h3,
+html.lang-zh .case-clue h3,
+html.lang-zh .case-accuse h3,
+html.lang-zh .file-sections h4,
+html.lang-zh .file-roll b { font-weight: 600; letter-spacing: 0.02em; }
+html.lang-zh .case-panel h2,
+html.lang-zh .file-head h2 { font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; }
+html.lang-zh .intro h1 { line-height: 1.25; }
+html.lang-zh .intro h1 em, html.lang-zh .case-hint, html.lang-zh .view-title .sub b { font-style: normal; }
+html.lang-zh .pill, html.lang-zh .case-count, html.lang-zh .case-hint-btn,
+html.lang-zh .case-suspect .name, html.lang-zh .case-hint-ring .label,
+html.lang-zh .case-exit, html.lang-zh .view-back, html.lang-zh .toggle { letter-spacing: 0.08em; }

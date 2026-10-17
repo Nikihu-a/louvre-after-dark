@@ -18,6 +18,7 @@ export const UI = {
   tagBy: "by Niki",
   back: "Gallery",
   explore: "Explore details",
+  caseOpen: "Find the cheat",
   next: (date) => `Next · ${date}`,
   endEyebrow: "End of the timeline",
   endTitle: "The collection",
@@ -36,4 +37,5 @@ export const UI = {
   cursorView: "View",
   cursorGo: "Go",
   lost: "Relighting the gallery…",
+  langLabel: "切换到中文",
 };

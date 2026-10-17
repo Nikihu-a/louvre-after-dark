@@ -1,6 +1,7 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { PAINTINGS } from "./data.js";
 import { UI } from "./strings.js";
+import { ZH_UI, ZH_PAINTINGS, ZH_CASES } from "./zh.js";
 import { Sound, TRACKS } from "./audio.js";
 import { Gallery, CARD_H } from "./gallery.js";
 import { Immersive, PARALLAX, fitHeight } from "./immersive.js";
@@ -65,11 +66,46 @@ function runTweens(now) {
 }
 
 // ---------------------------------------------------------------- strings
-const L = () => UI;
+// Language: English or Chinese, remembered per browser. Without a saved
+// choice, a Chinese browser gets Chinese.
+let lang = "en";
+try { lang = localStorage.getItem("lang") || ""; } catch { lang = ""; }
+if (lang !== "en" && lang !== "zh") lang = /^zh\b/i.test(navigator.language || "") ? "zh" : "en";
+
+const L = () => (lang === "zh" ? ZH_UI : UI);
+
+// A painting with its texts in the current language. Hotspots, clues and
+// suspects keep their positions from data.js and take texts by index.
+const byIndex = (base, over) => (over ? base.map((b, k) => ({ ...b, ...over[k] })) : base);
+function tp(i) {
+  const p = PAINTINGS[i];
+  const z = lang === "zh" && ZH_PAINTINGS[p.id];
+  if (!z) return p;
+  const out = { ...p, ...z, hotspots: byIndex(p.hotspots, z.hotspots) };
+  const zc = ZH_CASES[p.id];
+  if (p.case && zc) {
+    out.case = {
+      ...p.case, ...zc,
+      ui: { ...p.case.ui, ...zc.ui },
+      accuse: { ...p.case.accuse, ...zc.accuse },
+      clues: byIndex(p.case.clues, zc.clues),
+      suspects: byIndex(p.case.suspects, zc.suspects),
+    };
+  }
+  return out;
+}
+
 // Fill the interface strings marked with data-i18n.
 function fillStrings() {
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  document.documentElement.classList.toggle("lang-zh", lang === "zh");
+  const lb = document.getElementById("lang");
+  if (lb) {
+    lb.querySelector(".toggle-label").textContent = lang === "zh" ? "EN" : "中文";
+    lb.setAttribute("aria-label", L().langLabel);
+  }
   document.querySelectorAll("[data-i18n]").forEach((el) => {
-    const v = UI[el.dataset.i18n];
+    const v = L()[el.dataset.i18n];
     if (typeof v === "string") el.textContent = v;
   });
 }
@@ -92,6 +128,7 @@ const ui = {
 };
 
 // Wall (also the fallback without WebGL): each painting with a museum-style label.
+const wallLabels = [];
 PAINTINGS.forEach((p, i) => {
   const li = el("li");
   const b = el("button");
@@ -99,16 +136,29 @@ PAINTINGS.forEach((p, i) => {
   const frame = el("span", "frame");
   const img = el("img");
   img.src = `assets/paintings/${p.id}-card.webp`;
-  img.alt = `${p.title}, ${p.artist}`;
+  wallLabels.push({ img });
   img.loading = "lazy";
   frame.append(img);
   const label = el("span", "label");
-  label.append(el("span", "y", p.date), el("span", "t", p.title), el("span", "a", p.artist));
+  const y = el("span", "y"), t = el("span", "t"), a = el("span", "a");
+  Object.assign(wallLabels[i], { y, t, a });
+  label.append(y, t, a);
   b.append(frame, label);
   b.addEventListener("click", () => openPainting(i));
   li.append(b);
   ui.wallGrid.append(li);
 });
+
+function labelWall() {
+  wallLabels.forEach((w, i) => {
+    const p = tp(i);
+    w.img.alt = `${p.title}, ${p.artist}`;
+    w.y.textContent = p.date;
+    w.t.textContent = p.title;
+    w.a.textContent = p.artist;
+  });
+}
+labelWall();
 
 function noWebGL() {
   document.documentElement.classList.add("no-webgl");
@@ -285,9 +335,10 @@ function run(loadCard, loadFull, order, deep) {
     btn.addEventListener("click", () => openPainting(i));
     const year = el("p", "card-year");
     const era = el("span", "e");
-    year.append(el("span", "y", p.date), era);
+    const date = el("span", "y", p.date);
+    year.append(date, era);
     ui.cards.append(cap, btn, year);
-    return { cap, btn, year, artist, title, era };
+    return { cap, btn, year, artist, title, era, date };
   });
 
   const scrubBtns = PAINTINGS.map((p, i) => {
@@ -312,7 +363,9 @@ function run(loadCard, loadFull, order, deep) {
 
   function labelGallery() {
     const u = L();
-    PAINTINGS.forEach((p, i) => {
+    PAINTINGS.forEach((_, i) => {
+      const p = tp(i);
+      cardEls[i].date.textContent = p.date;
       cardEls[i].artist.textContent = p.artist;
       cardEls[i].title.textContent = p.title;
       cardEls[i].era.textContent = p.era;
@@ -326,9 +379,9 @@ function run(loadCard, loadFull, order, deep) {
   labelGallery();
 
   // ------------------------------------------------ view content
-  function fillView(i) {
+  function fillView(i, keepCase) {
     const u = L();
-    const p = PAINTINGS[i];
+    const p = tp(i);
     $("#v-eyebrow").textContent = `${p.date} · ${p.era}`;
     $("#v-original").textContent = p.original;
     $("#v-title").textContent = p.title;
@@ -346,12 +399,13 @@ function run(loadCard, loadFull, order, deep) {
         pal.append(sw);
       });
     }
-    const next = PAINTINGS[i + 1];
+    const next = i + 1 < N ? tp(i + 1) : null;
     $("#n-eyebrow").textContent = next ? u.next(next.date) : u.endEyebrow;
     $("#n-title").textContent = next ? next.title : u.endTitle;
     $("#n-go-label").textContent = next ? u.continue : u.leave;
 
-    kase.load(p);
+    if (keepCase) kase.relabel(p.case);
+    else kase.load(p);
     $("#case-open").hidden = !p.case;
 
     ui.hotspots.textContent = "";
@@ -368,7 +422,7 @@ function run(loadCard, loadFull, order, deep) {
   function setChapter(c, quiet) {
     c = clamp(c, 0, 4);
     S.chapter = c;
-    const p = PAINTINGS[S.current];
+    const p = tp(S.current);
     if (c >= 1 && c <= 3) {
       const h = p.hotspots[c - 1];
       $("#d-num").textContent = L().detailOf(c);
@@ -405,7 +459,7 @@ function run(loadCard, loadFull, order, deep) {
 
   const announce = (msg) => { ui.announce.textContent = msg; };
   const describe = (i) => {
-    const p = PAINTINGS[i];
+    const p = tp(i);
     return `${p.date}: ${p.title}, ${p.artist}`;
   };
 
@@ -606,6 +660,20 @@ function run(loadCard, loadFull, order, deep) {
     labelToggles();
   }
   ui.sound.addEventListener("click", () => setSound(!sound.on));
+
+  // Language: relabel everything in place, without leaving the painting or
+  // losing an investigation in progress.
+  $("#lang").addEventListener("click", () => {
+    lang = lang === "zh" ? "en" : "zh";
+    try { localStorage.setItem("lang", lang); } catch { /* not remembered */ }
+    fillStrings();
+    labelWall();
+    labelGallery();
+    if (S.mode === "view" || S.mode === "switching") {
+      fillView(S.current, true);
+      if (!kase.active) setChapter(S.chapter, true);
+    }
+  });
 
   const toggleLights = () => {
     S.lights = S.lights === "lamp" ? "on" : "lamp";

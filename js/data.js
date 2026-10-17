@@ -19,6 +19,18 @@ const CHEAT_CASE = {
   progress: (n, t) => `Evidence ${n} / ${t}`,
   keepSearching: "Keep searching",
   toAccuse: "Make your accusation",
+  ui: {
+    hint: "Hint",
+    showMe: "Show me",
+    lookHere: "Look here",
+    tapHere: "Tap here",
+    exit: "Leave the investigation",
+    evidence: (n) => `Evidence ${n}`,
+    bonus: "Bonus",
+    bonusCount: "+ 1 bonus",
+    guilty: "In on it",
+    innocent: "Innocent",
+  },
   clues: [
     { id: "ace", x: 0.055, y: 0.745, r: 0.09, zoom: 0.46,
       title: "The Ace Behind His Back",
