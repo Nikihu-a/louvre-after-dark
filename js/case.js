@@ -8,6 +8,10 @@
 // thread of light between the two figures. With the evidence in hand you name
 // who is in on it, and the case file tells you how you did and what the
 // painting is really about.
+//
+// Suspects with x/y are rings on faces in the painting; suspects without are
+// a lineup of cards (people who were never in the picture, like the suspects
+// in the 1911 theft of the Mona Lisa). `accuse.single` allows one choice.
 
 const el = (tag, cls, txt) => {
   const e = document.createElement(tag);
@@ -132,13 +136,20 @@ export class Case {
     this.hintEl.append(el("span", "label", this.fine ? U.lookHere : U.tapHere));
     this.hintEl.addEventListener("click", () => this.hinted && this.find(this.hinted));
     this.marks.append(this.hintEl);
+    this.lineup = el("div", "case-lineup");
     this.suspectEls = d.suspects.map((s) => {
-      const b = el("button", "case-suspect");
+      const inPicture = s.x != null;
+      const b = el("button", inPicture ? "case-suspect" : "case-card");
       b.type = "button";
       b.setAttribute("aria-pressed", "false");
-      b.append(el("span", "ring"), el("span", "name", s.name));
+      if (inPicture) b.append(el("span", "ring"), el("span", "name", s.name));
+      else {
+        b.append(el("span", "name", s.name));
+        if (s.role) b.append(el("span", "role", s.role));
+        if (s.about) b.append(el("span", "about", s.about));
+      }
       b.addEventListener("click", () => this.pick(s.id, b));
-      this.marks.append(b);
+      (inPicture ? this.marks : this.lineup).append(b);
       return b;
     });
 
@@ -172,6 +183,10 @@ export class Case {
 
     const accuse = this.panel("accuse");
     accuse.append(el("h3", null, d.accuse.title), el("p", "text", d.accuse.text));
+    if (this.lineup.childElementCount) {
+      accuse.classList.add("has-lineup");
+      accuse.append(this.lineup);
+    }
     this.accuseBtn = this.pill(d.accuse.button, () => this.verdict());
     this.accuseBtn.disabled = true;
     accuse.append(this.accuseBtn);
@@ -294,9 +309,15 @@ export class Case {
   pick(id, b) {
     if (this.state !== "accuse") return;
     if (this.picked.has(id)) this.picked.delete(id);
-    else this.picked.add(id);
-    b.classList.toggle("picked", this.picked.has(id));
-    b.setAttribute("aria-pressed", String(this.picked.has(id)));
+    else {
+      if (this.data.accuse.single) this.picked.clear();
+      this.picked.add(id);
+    }
+    this.data.suspects.forEach((sp, i) => {
+      const on = this.picked.has(sp.id);
+      this.suspectEls[i].classList.toggle("picked", on);
+      this.suspectEls[i].setAttribute("aria-pressed", String(on));
+    });
     this.accuseBtn.disabled = this.picked.size === 0;
   }
 
@@ -309,7 +330,7 @@ export class Case {
     this.fileRoll.textContent = "";
     d.suspects.forEach((s, i) => {
       const li = el("li", s.guilty ? "guilty" : "innocent");
-      li.append(el("b", null, s.name), el("span", "tag", s.guilty ? this.ui.guilty : this.ui.innocent), el("p", null, s.verdict));
+      li.append(el("b", null, s.name), el("span", "tag", s.tag || (s.guilty ? this.ui.guilty : this.ui.innocent)), el("p", null, s.verdict));
       this.fileRoll.append(li);
       this.suspectEls[i].classList.add(s.guilty ? "guilty" : "innocent");
     });
@@ -364,7 +385,9 @@ export class Case {
           : { zoom: 0.03, cx: 0.5, cy: 0.5, ambient: amb, lamp: 1.15 };
       }
       case "clue": return { zoom: c.zoom, cx: c.x, cy: c.y, ambient: 0.55, lamp: 0.55 };
-      case "accuse": return { zoom: 0.0, cx: 0.5, cy: 0.5, ambient: 0.62, lamp: 0.4 };
+      case "accuse": return this.lineup.childElementCount
+        ? { zoom: 0.0, cx: 0.5, cy: 0.5, ambient: 0.28, lamp: 0.3 }
+        : { zoom: 0.0, cx: 0.5, cy: 0.5, ambient: 0.62, lamp: 0.4 };
       default: return { zoom: 0.0, cx: 0.5, cy: 0.5, ambient: 0.3, lamp: 0.3 };
     }
   }
@@ -412,6 +435,7 @@ export class Case {
     const sheet = this.state === "file" ? this.panels.file.getBoundingClientRect().left : Infinity;
     this.data.suspects.forEach((sp, i) => {
       const b = this.suspectEls[i];
+      if (sp.x == null) { b.tabIndex = this.state === "accuse" ? 0 : -1; return; }
       const under = this.project(sp.x, sp.y)[0] > sheet - 40;
       show(b, sp.x, sp.y, sOn && !under);
       b.tabIndex = this.state === "accuse" ? 0 : -1;

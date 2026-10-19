@@ -407,6 +407,7 @@ function run(loadCard, loadFull, order, deep) {
     if (keepCase) kase.relabel(p.case);
     else kase.load(p);
     $("#case-open").hidden = !p.case;
+    if (p.case) $("#case-open b").textContent = p.case.button || u.caseOpen;
 
     ui.hotspots.textContent = "";
     hotspotBtns = p.hotspots.map((h, k) => {

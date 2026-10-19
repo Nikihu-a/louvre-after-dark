@@ -9,7 +9,21 @@
 // case.js). Clue x/y are image uv; `r` is how close the lamp must come, as a
 // fraction of the screen's shorter side. `look` draws a glance between two
 // points once the clue is found. A `bonus` clue is not needed to finish.
+const CASE_UI = {
+  hint: "Hint",
+  showMe: "Show me",
+  lookHere: "Look here",
+  tapHere: "Tap here",
+  exit: "Leave the investigation",
+  evidence: (n) => `Evidence ${n}`,
+  bonus: "Bonus",
+  bonusCount: "+ 1 bonus",
+  guilty: "In on it",
+  innocent: "Innocent",
+};
+
 const CHEAT_CASE = {
+  button: "Find the cheat",
   kicker: "An investigation",
   title: "Someone at this table is cheating.",
   intro: "Four players, no words. The man on the left has just turned to look straight at you. Take the lamp and search the table for proof: hold the light over anything suspicious.",
@@ -19,18 +33,7 @@ const CHEAT_CASE = {
   progress: (n, t) => `Evidence ${n} / ${t}`,
   keepSearching: "Keep searching",
   toAccuse: "Make your accusation",
-  ui: {
-    hint: "Hint",
-    showMe: "Show me",
-    lookHere: "Look here",
-    tapHere: "Tap here",
-    exit: "Leave the investigation",
-    evidence: (n) => `Evidence ${n}`,
-    bonus: "Bonus",
-    bonusCount: "+ 1 bonus",
-    guilty: "In on it",
-    innocent: "Innocent",
-  },
+  ui: CASE_UI,
   clues: [
     { id: "ace", x: 0.055, y: 0.745, r: 0.09, zoom: 0.46,
       title: "The Ace Behind His Back",
@@ -86,6 +89,80 @@ const CHEAT_CASE = {
   again: "Back to the painting",
 };
 
+// The 1911 theft. The evidence is found on the painting itself; the suspects
+// were never in it, so they appear as a lineup.
+const MONA_CASE = {
+  button: "Solve the 1911 theft",
+  kicker: "A cold case · Paris, 1911",
+  title: "On a Monday, she vanished.",
+  intro: "Monday 21 August 1911. The Louvre is closed to the public. By Tuesday, the wall where she hung holds nothing but four iron pegs. Search the painting for what the police had, and what they missed.",
+  start: "Open the case",
+  searchHint: "Search her with your lamp",
+  searchHintTouch: "Tap anything that could be evidence",
+  progress: (n, t) => `Evidence ${n} / ${t}`,
+  keepSearching: "Keep searching",
+  toAccuse: "Name the thief",
+  ui: { ...CASE_UI, guilty: "The thief", innocent: "Not the thief" },
+  clues: [
+    { id: "wall", x: 0.44, y: 0.27, r: 0.09, zoom: 0.46,
+      title: "A Day Before Anyone Noticed",
+      text: "On Tuesday morning the painter Louis Béroud arrived to paint her and found an empty space. The guards weren't worried: paintings were often taken down to be photographed. Only when the photographers said they didn't have her did the alarm go up. The thief had a full day's head start." },
+    { id: "frame", x: 0.1, y: 0.07, r: 0.08, zoom: 0.4,
+      title: "A Frame Left on the Stairs",
+      text: "Her frame and protective glass case turned up on the landing of a service staircase, set aside behind some students' canvases. Taking the case off cleanly is fiddly work. Whoever did it knew how it had been put together." },
+    { id: "smock", x: 0.6, y: 0.64, r: 0.09, zoom: 0.42,
+      title: "A White Smock on a Closed Day",
+      text: "On closed days the only people about were staff and workmen, many in white smocks. Nobody looks twice at one more. The thief came in through the workers' door early in the morning, and a plumber, taking him for staff, unlocked a service door to let him out." },
+    { id: "thumb", x: 0.47, y: 0.83, r: 0.09, zoom: 0.46,
+      title: "A Thumbprint on the Glass",
+      text: "The thief left a thumbprint on the glass case. Better still, the police already had the thief's fingerprints on file, from an earlier arrest in Paris. They fingerprinted the museum's staff and compared the prints. One name was never added to the list." },
+    { id: "italy", x: 0.13, y: 0.36, r: 0.09, zoom: 0.42,
+      title: "A View of Italy",
+      text: "Leonardo painted her in Florence. Years later, the thief would say he took her home: back to Italy, from which, he believed, Napoleon had stolen her. He had the history wrong, but it tells you where to look." },
+    { id: "bridge", bonus: true, x: 0.835, y: 0.455, r: 0.06, zoom: 0.5,
+      title: "Whose Bridge?",
+      text: "Over her left shoulder, a small arched bridge crosses a river. Several Italian towns claim it, among them Ponte Buriano near Arezzo and Bobbio in the north. No one has proved where, or whether, it really stood." },
+  ],
+  accuse: {
+    title: "Who took the Mona Lisa?",
+    text: "Four men were linked to the case. Name the one who walked out with her.",
+    button: "Name the thief",
+    single: true,
+  },
+  suspects: [
+    { id: "apollinaire", name: "Guillaume Apollinaire", role: "Poet and critic",
+      about: "Champion of the avant-garde. His former secretary had been stealing from the Louvre.",
+      guilty: false, tag: "Arrested, then released",
+      verdict: "Arrested on 7 September 1911 and held for about a week. He had nothing to do with the theft, and the case against him was dismissed." },
+    { id: "picasso", name: "Pablo Picasso", role: "Painter",
+      about: "Owned two small Iberian stone heads that had quietly gone missing from the Louvre.",
+      guilty: false, tag: "Questioned, then let go",
+      verdict: "Questioned by a judge, who dismissed the case with a warning. The Iberian heads he had bought were returned to the museum." },
+    { id: "pieret", name: "Géry Pieret", role: "Adventurer",
+      about: "Apollinaire's former secretary. He bragged to a newspaper that stealing from the Louvre was easy.",
+      guilty: false, tag: "A thief, but not hers",
+      verdict: "He really did steal from the Louvre: the Iberian statuettes, in 1907 and again in 1911. His boasting is what led the police to Apollinaire and Picasso." },
+    { id: "peruggia", name: "Vincenzo Peruggia", role: "Glazier",
+      about: "An Italian handyman who had worked at the Louvre, helping to put paintings behind glass. Once arrested in Paris.",
+      guilty: true, tag: "The thief",
+      verdict: "He built her glass case, knew the building, came in dressed as a workman and left his thumbprint behind. The police questioned him and let him go." },
+  ],
+  right: { title: "Vincenzo Peruggia.", text: "The glazier who had helped build her glass case. You found what took the police two years and four months to learn." },
+  wrong: { title: "The poet went to jail. The thief went home.", text: "It was Vincenzo Peruggia, the Italian glazier who had helped build her glass case." },
+  fileTitle: "The case file",
+  file: [
+    { h: "Two years in a trunk",
+      p: "Peruggia kept her in a trunk in his room in Paris for more than two years. In December 1913 he took her by train to Florence and offered her to the art dealer Alfredo Geri. Geri brought in Giovanni Poggi, director of the Uffizi, to check her; they called the police, and Peruggia was arrested at his hotel on 12 December." },
+    { h: "Home, he said",
+      p: "He told the court he had wanted to return her to Italy. But Napoleon never took her: Leonardo carried her to France himself, and she passed into the collection of King François I. His letters home suggest he also hoped to be paid. Sentenced to a year and fifteen days, he served about seven months." },
+    { h: "The theft that made her famous",
+      p: "Before 1911 she was admired by artists, not mobbed by the world. Her disappearance filled front pages everywhere, and crowds came to the Louvre to stare at the empty wall. When she came back in January 1914, she came back the most famous painting on earth." },
+    { h: "Picasso's stone heads",
+      p: "The Iberian heads Pieret stole in 1907 ended up with Picasso, and one of their faces found its way into his Les Demoiselles d'Avignon. When the Mona Lisa vanished, those old thefts were what put two of the most famous artists in Paris in front of a judge." },
+  ],
+  again: "Back to the painting",
+};
+
 export const PAINTINGS = [
   {
     id: "virgin-of-the-rocks",
@@ -129,6 +206,7 @@ export const PAINTINGS = [
     aspect: 1610 / 2400,
     focus: 0.6,
     tint: [1.0, 0.84, 0.6],
+    case: MONA_CASE,
     lead: "Lisa Gherardini, wife of a Florentine silk merchant, sat for Leonardo around 1503. He kept reworking the panel for years and never handed it over. It travelled with him to France, where it has stayed ever since.",
     hotspots: [
       { x: 0.44, y: 0.29, zoom: 0.48, title: "A Smile Made of Smoke",
