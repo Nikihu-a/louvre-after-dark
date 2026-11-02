@@ -1,19 +1,10 @@
 # Louvre After Dark
 
-**Walk the Louvre after hours with a lamp.** Ten masterpieces from 1483 to 1830, hung along a curved timeline in a dark 3D gallery. Open a painting to explore its depth, light and details.
+**Walk the Louvre after hours with a lamp.** Ten masterpieces from 1483 to 1830, hung along a curved timeline in a dark 3D gallery. Open any painting and it becomes a stage: figures step out of the canvas as you move, the lamp rakes across their forms, and the camera dollies in to the details that matter.
 
-[Explore the live gallery](https://nikihu-a.github.io/louvre-after-dark/) · [Lightweight version](https://nikihu-a.github.io/louvre-after-dark/?static)
+**Live site:** https://nikihu-a.github.io/louvre-after-dark/
 
-[![Louvre After Dark — live gallery screenshot](docs/preview.jpg)](https://nikihu-a.github.io/louvre-after-dark/)
-
-## Project in brief
-
-- **Audience & goal:** an online art experience for curious visitors, using chronology, light and close looking to invite exploration of ten paintings.
-- **My role:** curation, visual direction and interaction decisions by **Niki**, with AI-assisted development. Painting photographs, models, music and other third-party materials are credited below.
-- **Key decisions:** keep the collection and painting details on one page; make each work shareable; leave sound off until requested; provide a static fallback for devices without WebGL 2.
-- **What the prototype demonstrates:** a live 3D gallery, depth-based painting views and an investigation interaction. The technical and interaction details below document the implementation.
-
-一个用灯光与时间线引导观众细看名画的网页实验。由 Niki 策划与设计，结合 AI 协作开发；项目展示交互方案与技术实现。
+Curated, designed and built by **Niki**.
 
 ## The collection
 
